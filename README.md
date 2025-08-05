@@ -1,6 +1,5 @@
 # DNSSEC Validator
 
-[![GitHub Release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/releases)
 [![Docker Image Version](https://img.shields.io/docker/v/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BondIT-ApS/dnssec-validator/docker-publish.yml?branch=master&style=for-the-badge&logo=github)](https://github.com/BondIT-ApS/dnssec-validator/actions)
@@ -106,13 +105,16 @@ curl "http://localhost:8080/api/validate/bondit.dk"
 │   Web Frontend   │───▶│   Flask App     │───▶│  DNSSEC Engine  │
 │   (HTML/CSS/JS)  │    │   (Python)      │    │   (dnspython)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   DNS Servers   │
-                       │  (Root, TLD,    │
-                       │  Authoritative) │
-                       └─────────────────┘
+                                │                        │
+┌─────────────────┐             │                        │
+│   REST API       │◀────────────┤                        │
+│   (/api/validate)│             │                        │
+└─────────────────┘             ▼                        ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │   DNS Servers   │    │ DNSSEC Validation│
+                       │  (Root, TLD,    │    │ (Chain of Trust) │
+                       │  Authoritative) │    │                 │
+                       └─────────────────┘    └─────────────────┘
 ```
 
 ## 🔍 What It Validates
@@ -226,7 +228,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🏢 About BondIT ApS
 
-This project is maintained by [BondIT ApS](https://bondit.dk), a Danish software development company specializing in secure web applications and infrastructure tools.
+This project is maintained and developed by [BondIT ApS](https://bondit.dk), a Scandinavian IT Consultancy Company, which loves to build software one brick at a time and create fantastic secure web applications and infrastructure tools.
 
 ---
 
