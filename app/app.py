@@ -8,8 +8,8 @@ from dnssec_validator import DNSSECValidator
 app = Flask(__name__)
 CORS(app)
 limiter = Limiter(
-    app,
     key_func=get_remote_address,
+    app=app,
     default_limits=["200 per day", "50 per hour"]
 )
 
