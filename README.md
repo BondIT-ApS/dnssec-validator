@@ -100,21 +100,35 @@ curl "http://localhost:8080/api/validate/bondit.dk"
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Frontend   │───▶│   Flask App     │───▶│  DNSSEC Engine  │
-│   (HTML/CSS/JS)  │    │   (Python)      │    │   (dnspython)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                        │
-┌─────────────────┐             │                        │
-│   REST API       │◀────────────┤                        │
-│   (/api/validate)│             │                        │
-└─────────────────┘             ▼                        ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │   DNS Servers   │    │ DNSSEC Validation│
-                       │  (Root, TLD,    │    │ (Chain of Trust) │
-                       │  Authoritative) │    │                 │
-                       └─────────────────┘    └─────────────────┘
+```mermaid
+graph TB
+    subgraph "User Interface"
+        WEB["🌐 Web Frontend<br/>(HTML/CSS/JS)"]
+        API["🔌 REST API<br/>(/api/validate)"]
+    end
+    
+    subgraph "Application Layer"
+        FLASK["🐍 Flask App<br/>(Python)"]
+        ENGINE["🔒 DNSSEC Engine<br/>(dnspython)"]
+    end
+    
+    subgraph "External Services"
+        DNS["🌍 DNS Servers<br/>(Root, TLD, Authoritative)"]
+        VALIDATION["✅ DNSSEC Validation<br/>(Chain of Trust)"]
+    end
+    
+    WEB --> FLASK
+    API --> FLASK
+    FLASK --> ENGINE
+    ENGINE --> DNS
+    ENGINE --> VALIDATION
+    
+    style WEB fill:#e1f5fe
+    style API fill:#e8f5e8
+    style FLASK fill:#fff3e0
+    style ENGINE fill:#fce4ec
+    style DNS fill:#f3e5f5
+    style VALIDATION fill:#e0f2f1
 ```
 
 ## 🔍 What It Validates
