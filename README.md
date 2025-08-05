@@ -1,6 +1,15 @@
 # DNSSEC Validator
 
-A web-based DNSSEC validation tool that provides comprehensive analysis of DNS Security Extensions (DNSSEC) for any domain. This tool validates the complete chain of trust from root servers down to your domain, similar to Verisign's DNSSEC Debugger.
+[![GitHub Release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/releases)
+[![Docker Image Version](https://img.shields.io/docker/v/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
+[![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BondIT-ApS/dnssec-validator/docker-publish.yml?branch=master&style=for-the-badge&logo=github)](https://github.com/BondIT-ApS/dnssec-validator/actions)
+[![GitHub Issues](https://img.shields.io/github/issues/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/stargazers)
+[![License](https://img.shields.io/github/license/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/blob/master/LICENSE)
+[![Security Rating](https://img.shields.io/badge/security-A%2B-green?style=for-the-badge&logo=shield)](https://github.com/BondIT-ApS/dnssec-validator/security)
+
+A **professional-grade** web-based DNSSEC validation tool that provides comprehensive analysis of DNS Security Extensions (DNSSEC) for any domain. This tool validates the complete chain of trust from root servers down to your domain, similar to Verisign's DNSSEC Debugger but with modern architecture and enhanced features.
 
 ## 🚀 Features
 
@@ -20,7 +29,7 @@ Try the live version at: [Coming Soon]
 
 ```bash
 # Run the container
-docker run -p 8080:8080 bondit/dnssec-validator
+docker run -p 8080:8080 maboni82/dnssec-validator:latest
 
 # Open your browser to http://localhost:8080
 ```
