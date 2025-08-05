@@ -10,11 +10,19 @@
     <div class="container">
         <h1>DNSSEC Validator</h1>
         <form id="dnssec-form">
-            <input type="text" id="domain-input" placeholder="Enter a domain name (e.g., bondit.dk)" required>
+            <input type="text" id="domain-input" placeholder="Enter a domain name (e.g., bondit.dk)" value="{{ domain or '' }}" required>
             <button type="submit">Validate DNSSEC</button>
         </form>
         <div id="results-container"></div>
     </div>
+    <script>
+        // Auto-validate if domain is pre-filled
+        {% if domain %}
+        window.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('dnssec-form').dispatchEvent(new Event('submit'));
+        });
+        {% endif %}
+    </script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

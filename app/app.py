@@ -17,12 +17,24 @@ limiter = Limiter(
 def index():
     return render_template('index.html')
 
+@app.route('/<string:domain>')
+def check_domain_direct(domain):
+    # Direct access like /bondit.dk - render page with pre-filled domain
+    return render_template('index.html', domain=domain)
+
 @app.route('/api/validate/<string:domain>', methods=['GET'])
 @limiter.limit("10 per minute")
 def validate_domain(domain):
-    validator = DNSSECValidator(domain)
-    result = validator.validate()
-    return jsonify(result)
+    try:
+        validator = DNSSECValidator(domain)
+        result = validator.validate()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'domain': domain,
+            'status': 'error',
+            'errors': [str(e)]
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)

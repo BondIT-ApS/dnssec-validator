@@ -24,27 +24,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function displayResults(data) {
         let html = '<h2>Validation Results for ' + data.domain + '</h2>';
-        html += '<p><strong>Status:</strong> ' + data.status + '</p>';
-        html += '<p><strong>Validation Time:</strong> ' + data.validation_time + '</p>';
+        
+        // Status with appropriate styling
+        let statusClass = 'status-' + data.status;
+        html += '<p><strong>Status:</strong> <span class="' + statusClass + '">' + data.status.toUpperCase() + '</span></p>';
+        html += '<p><strong>Validation Time:</strong> ' + new Date(data.validation_time).toLocaleString() + '</p>';
 
         if (data.chain_of_trust && data.chain_of_trust.length > 0) {
-            html += '<h3>Chain of Trust</h3><ul>';
+            html += '<h3>Chain of Trust</h3>';
             data.chain_of_trust.forEach(function(zone) {
-                html += '<li>' + zone.zone + ' - ' + zone.status;
+                html += '<div class="chain-item">';
+                html += '<strong>' + zone.zone + '</strong> - <span class="status-' + zone.status + '">' + zone.status + '</span>';
                 if (zone.algorithm) {
-                    html += ' (Algorithm: ' + zone.algorithm + ', Key Tag: ' + zone.key_tag + ')';
+                    html += '<br><small>Algorithm: ' + zone.algorithm + ', Key Tag: ' + zone.key_tag + '</small>';
                 }
-                html += '</li>';
+                if (zone.error) {
+                    html += '<br><small class="status-error">Error: ' + zone.error + '</small>';
+                }
+                html += '</div>';
             });
-            html += '</ul>';
+        }
+
+        // Show DNSKEY records if available
+        if (data.records && data.records.dnskey && data.records.dnskey.length > 0) {
+            html += '<h3>DNSKEY Records</h3>';
+            data.records.dnskey.forEach(function(key) {
+                html += '<div class="chain-item">';
+                html += '<strong>Zone:</strong> ' + key.zone + '<br>';
+                html += '<strong>Algorithm:</strong> ' + key.algorithm + '<br>';
+                html += '<strong>Key Tag:</strong> ' + key.key_tag + '<br>';
+                html += '<strong>Flags:</strong> ' + key.flags;
+                html += '</div>';
+            });
         }
 
         if (data.errors && data.errors.length > 0) {
-            html += '<h3>Errors</h3><ul>';
+            html += '<h3>Errors</h3>';
             data.errors.forEach(function(error) {
-                html += '<li>' + error + '</li>';
+                html += '<div class="error-item">' + error + '</div>';
             });
-            html += '</ul>';
         }
 
         resultsContainer.innerHTML = html;
