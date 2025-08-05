@@ -53,12 +53,52 @@ def sanitize_error(error):
     return "An error occurred while processing your request"
 
 # Define API models for documentation
+dnskey_record_model = api.model('DNSKEYRecord', {
+    'zone': fields.String(required=True, description='The zone this key belongs to'),
+    'flags': fields.Integer(required=True, description='DNSKEY flags'),
+    'protocol': fields.Integer(required=True, description='Protocol (always 3 for DNSSEC)'),
+    'algorithm': fields.Integer(required=True, description='Cryptographic algorithm'),
+    'key_tag': fields.Integer(required=True, description='Key identifier')
+})
+
+ds_record_model = api.model('DSRecord', {
+    'zone': fields.String(required=True, description='The zone this DS record belongs to'),
+    'key_tag': fields.Integer(required=True, description='Key tag of the DNSKEY'),
+    'algorithm': fields.Integer(required=True, description='Cryptographic algorithm'),
+    'digest_type': fields.Integer(required=True, description='Digest algorithm')
+})
+
+rrsig_record_model = api.model('RRSIGRecord', {
+    'type_covered': fields.String(required=True, description='Record type covered by this signature'),
+    'algorithm': fields.Integer(required=True, description='Cryptographic algorithm'),
+    'labels': fields.Integer(required=True, description='Number of labels in the signed name'),
+    'original_ttl': fields.Integer(required=True, description='Original TTL of the signed RRset'),
+    'expiration': fields.Integer(required=True, description='Signature expiration time'),
+    'inception': fields.Integer(required=True, description='Signature inception time'),
+    'key_tag': fields.Integer(required=True, description='Key tag of the signing key'),
+    'signer': fields.String(required=True, description='Name of the signing zone')
+})
+
+records_model = api.model('DNSSECRecords', {
+    'dnskey': fields.List(fields.Nested(dnskey_record_model), description='DNSKEY records'),
+    'ds': fields.List(fields.Nested(ds_record_model), description='DS records'),
+    'rrsig': fields.List(fields.Nested(rrsig_record_model), description='RRSIG records')
+})
+
+chain_of_trust_model = api.model('ChainOfTrust', {
+    'zone': fields.String(required=True, description='Zone name'),
+    'status': fields.String(required=True, description='Validation status for this zone'),
+    'algorithm': fields.Integer(description='Cryptographic algorithm used'),
+    'key_tag': fields.Integer(description='Key tag of the zone key'),
+    'error': fields.String(description='Error message if validation failed')
+})
+
 validation_result_model = api.model('ValidationResult', {
     'domain': fields.String(required=True, description='The domain that was validated'),
     'status': fields.String(required=True, description='Validation status', enum=['valid', 'invalid', 'error']),
     'validation_time': fields.String(required=True, description='ISO timestamp of validation'),
-    'chain_of_trust': fields.List(fields.Raw, description='Chain of trust validation details'),
-    'records': fields.Raw(description='DNSSEC records found'),
+    'chain_of_trust': fields.List(fields.Nested(chain_of_trust_model), description='Chain of trust validation details'),
+    'records': fields.Nested(records_model, description='DNSSEC records found'),
     'errors': fields.List(fields.String, description='Any errors encountered during validation')
 })
 
@@ -75,9 +115,8 @@ ns = api.namespace('validate', description='DNSSEC validation operations')
 @ns.param('domain', 'The domain name to validate (e.g., bondit.dk)')
 class DNSSECValidation(Resource):
     @ns.doc('validate_domain')
-    @ns.marshal_with(validation_result_model, code=200)
-    @ns.marshal_with(error_model, code=500)
-    @ns.response(200, 'Success - Domain validation completed')
+    @ns.expect()
+    @ns.response(200, 'Success - Domain validation completed', validation_result_model)
     @ns.response(400, 'Bad Request - Invalid domain format')
     @ns.response(429, 'Too Many Requests - Rate limit exceeded')
     @ns.response(500, 'Internal Server Error - Validation failed')
