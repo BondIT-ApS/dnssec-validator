@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNSSEC Validator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>DNSSEC Validator</h1>
+        <form id="dnssec-form">
+            <input type="text" id="domain-input" placeholder="Enter a domain name (e.g., bondit.dk)" required>
+            <button type="submit">Validate DNSSEC</button>
+        </form>
+        <div id="results-container"></div>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
