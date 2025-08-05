@@ -3,12 +3,27 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_restx import Api, Resource, fields
+from flask_talisman import Talisman
 import logging
+import os
 
 from dnssec_validator import DNSSECValidator
 
 app = Flask(__name__)
-CORS(app)
+
+# Security enhancements
+CORS(app, origins=os.getenv('CORS_ORIGINS', 'http://localhost:8080').split(','))
+Talisman(
+    app,
+    force_https=os.getenv('FLASK_ENV') == 'production',
+    strict_transport_security=True,
+    content_security_policy={
+        'default-src': "'self'",
+        'script-src': "'self' 'unsafe-inline'",
+        'style-src': "'self' 'unsafe-inline'"
+    }
+)
+
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
