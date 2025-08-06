@@ -1,0 +1,416 @@
+{
+  "meta": {
+    "version": "1",
+    "type": "dashboard",
+    "name": "DNSSEC Validator Analytics (Complete)",
+    "description": "Comprehensive analytics dashboard for DNSSEC Validator including all requests (internal and external)"
+  },
+  "content": {
+    "data": {
+      "type": "dashboard",
+      "attributes": {
+        "name": "DNSSEC Validator Analytics (Complete)",
+        "description": "Comprehensive analytics dashboard for DNSSEC Validator including all requests (internal and external)",
+        "charts": [
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "xy",
+              "queries": [
+                {
+                  "name": "Hourly Request Volume",
+                  "text": "from(bucket: \"requests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)\n  |> yield(name: \"hourly_requests\")",
+                  "editMode": "advanced",
+                  "builderConfig": {
+                    "buckets": ["requests"],
+                    "tags": [
+                      {
+                        "key": "_measurement",
+                        "values": ["request"],
+                        "aggregateFunctionType": "filter"
+                      }
+                    ],
+                    "functions": [
+                      {
+                        "name": "sum"
+                      }
+                    ],
+                    "aggregateWindow": {
+                      "period": "1h",
+                      "fillValues": false
+                    }
+                  }
+                }
+              ],
+              "axes": {
+                "x": {
+                  "bounds": ["", ""],
+                  "label": "Time",
+                  "prefix": "",
+                  "suffix": "",
+                  "base": "10",
+                  "scale": "linear"
+                },
+                "y": {
+                  "bounds": ["", ""],
+                  "label": "Requests",
+                  "prefix": "",
+                  "suffix": "",
+                  "base": "10",
+                  "scale": "linear"
+                }
+              },
+              "xColumn": "_time",
+              "yColumn": "_value",
+              "shadeBelow": true,
+              "colors": [
+                {
+                  "id": "base",
+                  "type": "scale",
+                  "hex": "#31C0F6",
+                  "name": "Nineteen Eighty Four",
+                  "value": 0
+                }
+              ],
+              "legend": {},
+              "note": "Total request volume over time (including internal requests)",
+              "showNoteWhenEmpty": false
+            },
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 4
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "single-stat",
+              "queries": [
+                {
+                  "name": "Total Requests (24h)",
+                  "text": "from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> sum()\n  |> yield(name: \"total_24h\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "colors": [
+                {
+                  "id": "base",
+                  "type": "text",
+                  "hex": "#00C9FF"
+                }
+              ],
+              "decimalPlaces": {
+                "isEnforced": true,
+                "digits": 0
+              },
+              "note": "Total requests in last 24 hours",
+              "showNoteWhenEmpty": false,
+              "prefix": "",
+              "suffix": " requests"
+            },
+            "x": 0,
+            "y": 4,
+            "w": 3,
+            "h": 2
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "single-stat",
+              "queries": [
+                {
+                  "name": "External Requests (24h)",
+                  "text": "from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> filter(fn: (r) => r[\"internal\"] == \"false\")\n  |> sum()\n  |> yield(name: \"external_24h\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "colors": [
+                {
+                  "id": "base",
+                  "type": "text",
+                  "hex": "#32B08C"
+                }
+              ],
+              "decimalPlaces": {
+                "isEnforced": true,
+                "digits": 0
+              },
+              "note": "External validation requests in last 24 hours",
+              "showNoteWhenEmpty": false,
+              "prefix": "",
+              "suffix": " external"
+            },
+            "x": 3,
+            "y": 4,
+            "w": 3,
+            "h": 2
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "single-stat",
+              "queries": [
+                {
+                  "name": "Internal Requests (24h)",
+                  "text": "from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> filter(fn: (r) => r[\"internal\"] == \"true\")\n  |> sum()\n  |> yield(name: \"internal_24h\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "colors": [
+                {
+                  "id": "base",
+                  "type": "text",
+                  "hex": "#FFB94A"
+                }
+              ],
+              "decimalPlaces": {
+                "isEnforced": true,
+                "digits": 0
+              },
+              "note": "Internal system requests in last 24 hours",
+              "showNoteWhenEmpty": false,
+              "prefix": "",
+              "suffix": " internal"
+            },
+            "x": 6,
+            "y": 4,
+            "w": 3,
+            "h": 2
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "single-stat",
+              "queries": [
+                {
+                  "name": "Success Rate",
+                  "text": "valid = from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> filter(fn: (r) => r[\"internal\"] == \"false\")\n  |> filter(fn: (r) => r[\"dnssec_status\"] == \"valid\")\n  |> sum()\n\ntotal = from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> filter(fn: (r) => r[\"internal\"] == \"false\")\n  |> sum()\n\njoin(tables: {valid: valid, total: total}, on: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if r._value_total > 0 then (float(v: r._value_valid) / float(v: r._value_total)) * 100.0 else 0.0}))\n  |> yield(name: \"success_rate\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "colors": [
+                {
+                  "id": "base",
+                  "type": "text",
+                  "hex": "#32B08C"
+                }
+              ],
+              "decimalPlaces": {
+                "isEnforced": true,
+                "digits": 1
+              },
+              "note": "DNSSEC validation success rate (external requests only)",
+              "showNoteWhenEmpty": false,
+              "prefix": "",
+              "suffix": "%"
+            },
+            "x": 9,
+            "y": 4,
+            "w": 3,
+            "h": 2
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "xy",
+              "queries": [
+                {
+                  "name": "External vs Internal Requests",
+                  "text": "external = from(bucket: \"requests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> filter(fn: (r) => r[\"internal\"] == \"false\")\n  |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)\n  |> set(key: \"type\", value: \"external\")\n\ninternal = from(bucket: \"requests\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> filter(fn: (r) => r[\"internal\"] == \"true\")\n  |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)\n  |> set(key: \"type\", value: \"internal\")\n\nunion(tables: [external, internal])\n  |> yield(name: \"request_types\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "axes": {
+                "x": {
+                  "bounds": ["", ""],
+                  "label": "Time",
+                  "prefix": "",
+                  "suffix": "",
+                  "base": "10",
+                  "scale": "linear"
+                },
+                "y": {
+                  "bounds": ["", ""],
+                  "label": "Requests",
+                  "prefix": "",
+                  "suffix": "",
+                  "base": "10",
+                  "scale": "linear"
+                }
+              },
+              "xColumn": "_time",
+              "yColumn": "_value",
+              "colors": [
+                {
+                  "id": "external",
+                  "type": "scale",
+                  "hex": "#32B08C",
+                  "name": "External",
+                  "value": 0
+                },
+                {
+                  "id": "internal",
+                  "type": "scale",
+                  "hex": "#FFB94A",
+                  "name": "Internal",
+                  "value": 0
+                }
+              ],
+              "legend": {},
+              "note": "Comparison of external validation requests vs internal system requests",
+              "showNoteWhenEmpty": false
+            },
+            "x": 0,
+            "y": 6,
+            "w": 6,
+            "h": 4
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "mosaic",
+              "queries": [
+                {
+                  "name": "DNSSEC Validation Results",
+                  "text": "from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> filter(fn: (r) => r[\"internal\"] == \"false\")\n  |> group(columns: [\"dnssec_status\"])\n  |> sum()\n  |> group()\n  |> yield(name: \"validation_results\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "colors": [
+                {
+                  "id": "valid",
+                  "type": "scale",
+                  "hex": "#32B08C",
+                  "name": "Valid",
+                  "value": 0
+                },
+                {
+                  "id": "invalid",
+                  "type": "scale",
+                  "hex": "#F95F53",
+                  "name": "Invalid",
+                  "value": 0
+                },
+                {
+                  "id": "error",
+                  "type": "scale",
+                  "hex": "#FFB94A",
+                  "name": "Error",
+                  "value": 0
+                }
+              ],
+              "xColumn": "dnssec_status",
+              "yColumn": "_value",
+              "note": "Distribution of DNSSEC validation results (external requests only)",
+              "showNoteWhenEmpty": false
+            },
+            "x": 6,
+            "y": 6,
+            "w": 6,
+            "h": 4
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "table",
+              "queries": [
+                {
+                  "name": "Top Domains (All Requests)",
+                  "text": "from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> group(columns: [\"domain\", \"internal\"])\n  |> sum()\n  |> group()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> limit(n: 20)\n  |> yield(name: \"top_domains\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "colors": [],
+              "tableOptions": {
+                "verticalTimeAxis": true,
+                "sortBy": {
+                  "internalName": "_value",
+                  "displayName": "_value",
+                  "visible": true
+                }
+              },
+              "fieldOptions": [
+                {
+                  "internalName": "domain",
+                  "displayName": "Domain",
+                  "visible": true
+                },
+                {
+                  "internalName": "internal",
+                  "displayName": "Internal",
+                  "visible": true
+                },
+                {
+                  "internalName": "_value",
+                  "displayName": "Requests",
+                  "visible": true
+                }
+              ],
+              "timeFormat": "YYYY-MM-DD HH:mm:ss",
+              "decimalPlaces": {
+                "isEnforced": false,
+                "digits": 2
+              },
+              "note": "Most frequently requested domains with internal/external classification",
+              "showNoteWhenEmpty": false
+            },
+            "x": 0,
+            "y": 10,
+            "w": 6,
+            "h": 4
+          },
+          {
+            "properties": {
+              "shape": "chronograf-v2",
+              "type": "table",
+              "queries": [
+                {
+                  "name": "Request Sources",
+                  "text": "from(bucket: \"requests\")\n  |> range(start: -24h)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"request\")\n  |> filter(fn: (r) => r[\"_field\"] == \"count\")\n  |> group(columns: [\"source\", \"internal\"])\n  |> sum()\n  |> group()\n  |> sort(columns: [\"_value\"], desc: true)\n  |> yield(name: \"request_sources\")",
+                  "editMode": "advanced"
+                }
+              ],
+              "colors": [],
+              "tableOptions": {
+                "verticalTimeAxis": true,
+                "sortBy": {
+                  "internalName": "_value",
+                  "displayName": "_value",
+                  "visible": true
+                }
+              },
+              "fieldOptions": [
+                {
+                  "internalName": "source",
+                  "displayName": "Source",
+                  "visible": true
+                },
+                {
+                  "internalName": "internal",
+                  "displayName": "Internal",
+                  "visible": true
+                },
+                {
+                  "internalName": "_value",
+                  "displayName": "Requests",
+                  "visible": true
+                }
+              ],
+              "timeFormat": "YYYY-MM-DD HH:mm:ss",
+              "decimalPlaces": {
+                "isEnforced": false,
+                "digits": 2
+              },
+              "note": "Request sources breakdown with internal/external classification",
+              "showNoteWhenEmpty": false
+            },
+            "x": 6,
+            "y": 10,
+            "w": 6,
+            "h": 4
+          }
+        ]
+      }
+    }
+  }
+}
