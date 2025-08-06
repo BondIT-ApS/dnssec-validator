@@ -22,7 +22,13 @@ A **professional-grade** web-based DNSSEC validation tool that provides comprehe
 
 ## 🌐 Live Demo
 
-Try the live version at: [Coming Soon]
+🎉 **Try the live version at: [https://dnssec-validator.bondit.dk](https://dnssec-validator.bondit.dk)**
+
+The production deployment includes:
+- ✅ HTTPS with SSL/TLS encryption
+- ✅ Professional domain and hosting
+- ✅ High availability and monitoring
+- ✅ Full API documentation at `/api/docs/`
 
 ## 🐳 Quick Start with Docker
 
@@ -215,13 +221,12 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📋 Todo / Roadmap
 
-- [ ] Add support for CAA record validation
-- [ ] Implement TLSA record checking
-- [ ] Add DNS over HTTPS (DoH) support
-- [ ] Create batch validation API
-- [ ] Add monitoring and metrics
-- [ ] Implement caching for faster responses
-- [ ] Add support for internationalized domain names (IDN)
+- [ ] [Add support for CAA record validation](https://github.com/BondIT-ApS/dnssec-validator/issues/35)
+- [ ] [Implement TLSA record checking](https://github.com/BondIT-ApS/dnssec-validator/issues/34)
+- [ ] [Create batch validation API](https://github.com/BondIT-ApS/dnssec-validator/issues/32)
+- [ ] [Add database for request logging and monitoring](https://github.com/BondIT-ApS/dnssec-validator/issues/33)
+- [ ] [Implement caching for faster responses](https://github.com/BondIT-ApS/dnssec-validator/issues/36)
+- [ ] [Add support for internationalized domain names (IDN)](https://github.com/BondIT-ApS/dnssec-validator/issues/37)
 
 ## ⚠️ Security Considerations
 
@@ -242,7 +247,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🏢 About BondIT ApS
 
-This project is maintained and developed by [BondIT ApS](https://bondit.dk), a Scandinavian IT Consultancy Company, which loves to build software one brick at a time and create fantastic secure web applications and infrastructure tools.
+This project is maintained and developed by [BondIT ApS](https://bondit.dk), a Scandinavian IT consultancy specializing in secure web applications and infrastructure solutions. Just like our fellow Danish company LEGO, we believe in building things one brick at a time – except our bricks are lines of code, and instead of stepping on them barefoot at 3 AM, you'll actually enjoy using what we build! 🧱💻
 
 ---
 
