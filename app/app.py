@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, g
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -11,6 +11,7 @@ import psutil
 from datetime import datetime, timezone
 
 from dnssec_validator import DNSSECValidator
+from models import RequestLog
 
 app = Flask(__name__)
 
@@ -52,6 +53,82 @@ limiter = Limiter(
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Request logging functionality
+def get_client_ip():
+    """Get the real client IP address considering proxies"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    else:
+        return request.remote_addr or 'unknown'
+
+def should_log_request():
+    """Determine if request should be logged (skip health checks, static files)"""
+    # Skip health check endpoints
+    if request.path.startswith('/health'):
+        return False
+    # Skip static files
+    if request.path.startswith('/static'):
+        return False
+    # Skip API docs
+    if request.path.startswith('/api/docs') or request.path == '/swaggerui':
+        return False
+    return True
+
+@app.after_request
+def log_request(response):
+    """Log request after completion if logging is enabled"""
+    if not should_log_request():
+        return response
+    
+    # Check if logging is enabled
+    if os.getenv('REQUEST_LOGGING_ENABLED', 'true').lower() != 'true':
+        return response
+    
+    try:
+        # Determine source (api vs webapp)
+        source = 'api' if request.path.startswith('/api/') else 'webapp'
+        
+        # Extract domain from request
+        domain = 'unknown'
+        if request.path.startswith('/api/validate/'):
+            domain = request.path.replace('/api/validate/', '')
+        elif request.path != '/' and not request.path.startswith('/api/docs'):
+            # Direct domain access like /bondit.dk
+            domain = request.path.lstrip('/')
+        
+        # Get DNSSEC status from response if available
+        dnssec_status = 'unknown'
+        if hasattr(g, 'dnssec_status'):
+            dnssec_status = g.dnssec_status
+        elif response.status_code == 200 and source == 'api':
+            # Try to parse status from response JSON
+            try:
+                if response.is_json:
+                    data = response.get_json()
+                    if isinstance(data, dict) and 'status' in data:
+                        dnssec_status = data['status']
+            except:
+                pass
+        elif response.status_code >= 400:
+            dnssec_status = 'error'
+        
+        # Log the request
+        RequestLog.log_request(
+            ip_address=get_client_ip(),
+            domain=domain,
+            http_status=response.status_code,
+            dnssec_status=dnssec_status,
+            source=source,
+            user_agent=request.headers.get('User-Agent', ''),
+        )
+        
+    except Exception as e:
+        logger.warning(f"Failed to log request: {e}")
+    
+    return response
 
 # Initialize Flask-RESTX
 api = Api(
