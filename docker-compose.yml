@@ -14,6 +14,16 @@ services:
       - RATE_LIMIT_WEB_HOUR=500      # Web interface requests per IP per hour
       # CORS configuration for production
       # - CORS_ORIGINS=https://dnssec-validator.bondit.dk,https://yourdomain.com
+      # Health check configuration
+      - HEALTH_CHECK_ENABLED=true
+      - HEALTH_CHECK_DNS_TEST=true
+      - HEALTH_CHECK_MEMORY_THRESHOLD=90
     volumes:
       - ./app:/app
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/simple')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
