@@ -18,9 +18,13 @@ services:
       - HEALTH_CHECK_ENABLED=true
       - HEALTH_CHECK_DNS_TEST=true
       - HEALTH_CHECK_MEMORY_THRESHOLD=90
+      # Database logging configuration
+      - REQUEST_LOGGING_ENABLED=true
+      - LOG_RETENTION_DAYS=30
+      - DATABASE_URL=sqlite:///dnssec_validator.db
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/simple')"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/simple"]
       interval: 30s
       timeout: 10s
       retries: 3
