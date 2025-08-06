@@ -416,68 +416,6 @@ class InfluxDBLogger:
         except Exception as e:
             return {'error': f'Error getting database info: {e}'}
     
-    def create_dashboard_from_file(self, dashboard_file_path: str) -> bool:
-        """Create dashboard from JSON file"""
-        try:
-            if not self.client:
-                print("InfluxDB client not available")
-                return False
-
-            import json
-            import requests
-            
-            # Read dashboard JSON file
-            with open(dashboard_file_path, 'r') as f:
-                dashboard_def = json.load(f)
-            
-            # Extract dashboard data from the file structure
-            dashboard_content = dashboard_def.get('content', {}).get('data', {}).get('attributes', {})
-            dashboard_name = dashboard_content.get('name', 'DNSSEC Validator Analytics')
-            dashboard_description = dashboard_content.get('description', '')
-            
-            # Check if dashboard already exists
-            existing_dashboards_url = f"{self.url}/api/v2/dashboards?org={self.org}"
-            headers = {'Authorization': f'Token {self.token}'}
-            
-            response = requests.get(existing_dashboards_url, headers=headers)
-            if response.status_code == 200:
-                dashboards = response.json().get('dashboards', [])
-                for dash in dashboards:
-                    if dash.get('name') == dashboard_name:
-                        print(f"Dashboard '{dashboard_name}' already exists with ID: {dash.get('id')}")
-                        return True
-            
-            # Create new dashboard using HTTP API
-            create_dashboard_url = f"{self.url}/api/v2/dashboards"
-            dashboard_payload = {
-                'name': dashboard_name,
-                'description': dashboard_description,
-                'orgID': self.client.organizations_api().find_organizations(org=self.org)[0].id
-            }
-            
-            response = requests.post(
-                create_dashboard_url, 
-                headers=headers,
-                json=dashboard_payload
-            )
-            
-            if response.status_code == 201:
-                dashboard_id = response.json().get('id')
-                print(f"Successfully created dashboard '{dashboard_name}' with ID: {dashboard_id}")
-                
-                # Note: Adding cells (charts) to dashboard requires additional API calls
-                # For now, we create the basic dashboard structure
-                # The JSON file can be manually imported through the InfluxDB UI
-                print(f"To complete setup, import the dashboard JSON file '{dashboard_file_path}' through the InfluxDB UI")
-                return True
-            else:
-                print(f"Failed to create dashboard: {response.status_code} - {response.text}")
-                return False
-            
-        except Exception as e:
-            print(f"Error creating dashboard from file: {e}")
-            return False
-    
     def close(self):
         """Close InfluxDB client connection"""
         if self._client:

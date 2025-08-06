@@ -18,10 +18,9 @@ import db_init
 # Check if any database management environment variables are set
 db_recreate = os.getenv('INFLUX_DB_RECREATE', 'false').lower() == 'true'
 db_truncate = os.getenv('INFLUX_DB_TRUNCATE', 'false').lower() == 'true'
-db_create_dashboard = os.getenv('INFLUX_DB_CREATE_DASHBOARD', 'false').lower() == 'true'
 
 # Run database initialization regardless of how the app is started (direct Python or Gunicorn)
-if db_recreate or db_truncate or db_create_dashboard:
+if db_recreate or db_truncate:
     print("🗄️  Database management operations requested...")
     import sys
     if not db_init.initialize_database():

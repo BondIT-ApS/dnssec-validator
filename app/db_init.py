@@ -30,7 +30,6 @@ def initialize_database():
     # Get environment variables
     recreate_db = os.getenv('INFLUX_DB_RECREATE', 'false').lower() == 'true'
     truncate_db = os.getenv('INFLUX_DB_TRUNCATE', 'false').lower() == 'true'
-    create_dashboard = os.getenv('INFLUX_DB_CREATE_DASHBOARD', 'false').lower() == 'true'
     db_version = os.getenv('INFLUX_DB_VERSION', None)
     init_wait = int(os.getenv('INFLUX_DB_INIT_WAIT', '5'))
     
@@ -40,7 +39,6 @@ def initialize_database():
     print(f"   Bucket: {influx_logger.bucket}")
     print(f"   Recreate Database: {recreate_db}")
     print(f"   Truncate Database: {truncate_db}")
-    print(f"   Create Dashboard: {create_dashboard}")
     print(f"   Schema Version: {db_version or 'Not specified'}")
     print()
     
@@ -115,35 +113,6 @@ def initialize_database():
                 print("\\n⏹️  Truncation cancelled by user")
                 return False
         
-        # Create dashboard if requested
-        if create_dashboard:
-            print("📊 Creating InfluxDB dashboard...")
-            # Try multiple potential paths for the dashboard file
-            dashboard_paths = [
-                '/app/influxdb-dashboard.json',  # If mounted as volume
-                os.path.join(os.path.dirname(os.path.dirname(__file__)), 'influxdb-dashboard.json'),  # Relative to project root
-                '/influxdb-dashboard.json'  # Absolute root path
-            ]
-            
-            dashboard_file = None
-            for path in dashboard_paths:
-                if os.path.exists(path):
-                    dashboard_file = path
-                    break
-            
-            print(f"   Dashboard file: {dashboard_file or 'Not found'}")
-            
-            if dashboard_file and os.path.exists(dashboard_file):
-                if influx_logger.create_dashboard_from_file(dashboard_file):
-                    print("✅ Dashboard created successfully")
-                else:
-                    print("⚠️  Dashboard creation failed (non-critical - continuing...)")
-                    # Don't fail the entire initialization for dashboard creation failure
-            else:
-                print(f"⚠️  Dashboard file not found: {dashboard_file}")
-                print("   Skipping dashboard creation (non-critical - continuing...)")
-            print()
-        
         # Display final status
         if success:
             print()
@@ -182,7 +151,7 @@ def print_environment_variables():
     print("🔧 Environment Variables:")
     env_vars = [
         'INFLUX_URL', 'INFLUX_ORG', 'INFLUX_BUCKET', 'INFLUX_TOKEN',
-        'INFLUX_DB_RECREATE', 'INFLUX_DB_TRUNCATE', 'INFLUX_DB_CREATE_DASHBOARD', 'INFLUX_DB_VERSION', 'INFLUX_DB_INIT_WAIT'
+        'INFLUX_DB_RECREATE', 'INFLUX_DB_TRUNCATE', 'INFLUX_DB_VERSION', 'INFLUX_DB_INIT_WAIT'
     ]
     
     for var in env_vars:
