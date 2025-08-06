@@ -247,7 +247,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🏢 About BondIT ApS
 
-This project is maintained and developed by [BondIT ApS](https://bondit.dk), a Scandinavian IT Consultancy Company, which loves to build software one brick at a time and create fantastic secure web applications and infrastructure tools.
+This project is maintained and developed by [BondIT ApS](https://bondit.dk), a Scandinavian IT consultancy specializing in secure web applications and infrastructure solutions. We are passionate about building robust, scalable software that prioritizes security and reliability.
 
 ---
 
