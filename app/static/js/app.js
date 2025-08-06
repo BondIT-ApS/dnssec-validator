@@ -11,8 +11,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    function escapeHTML(str) {
+        return str.replace(/[&<>"']/g, function (m) {
+            switch (m) {
+                case '&': return '&amp;';
+                case '<': return '&lt;';
+                case '>': return '&gt;';
+                case '"': return '&quot;';
+                case "'": return '&#39;';
+                default: return m;
+            }
+        });
+    }
+
     function validateDomain(domain) {
-        resultsContainer.innerHTML = '<p>Validating DNSSEC for ' + domain + '...</p>';
+        resultsContainer.innerHTML = '<p>Validating DNSSEC for ' + escapeHTML(domain) + '...</p>';
         
         fetch('/api/validate/' + encodeURIComponent(domain))
             .then(response => response.json())
