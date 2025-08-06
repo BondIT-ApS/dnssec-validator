@@ -26,7 +26,7 @@ Talisman(
     strict_transport_security=True,
     content_security_policy={
         'default-src': "'self'",
-        'script-src': "'self' 'unsafe-inline'",
+        'script-src': "'self' 'unsafe-inline' https://cdn.jsdelivr.net",
         'style-src': "'self' 'unsafe-inline'"
     }
 )
@@ -204,18 +204,40 @@ error_model = api.model('ErrorResponse', {
     'errors': fields.List(fields.String, description='List of error messages')
 })
 
-# Define namespace
-ns = api.namespace('validate', description='DNSSEC validation operations')
+# Define namespaces
+ns_validate = api.namespace('validate', description='DNSSEC validation operations')
+ns_analytics = api.namespace('analytics', description='Analytics and statistics operations')
 
-@ns.route('/<string:domain>')
-@ns.param('domain', 'The domain name to validate (e.g., bondit.dk)')
+# Analytics API models
+analytics_overview_model = api.model('AnalyticsOverview', {
+    'total_requests': fields.Integer(description='Total requests in time period'),
+    'api_requests': fields.Integer(description='API requests in time period'),
+    'web_requests': fields.Integer(description='Web requests in time period'),
+    'validation_ratio': fields.Raw(description='DNSSEC validation success ratio'),
+    'top_domains': fields.List(fields.Raw, description='Most validated domains')
+})
+
+hourly_data_model = api.model('HourlyData', {
+    'timestamp': fields.String(description='Hour timestamp'),
+    'requests': fields.Integer(description='Number of requests in this hour')
+})
+
+timeseries_model = api.model('TimeSeriesData', {
+    'data': fields.List(fields.Nested(hourly_data_model), description='Hourly request data'),
+    'period': fields.String(description='Time period covered'),
+    'total': fields.Integer(description='Total requests in period')
+})
+
+# DNSSEC Validation endpoints
+@ns_validate.route('/<string:domain>')
+@ns_validate.param('domain', 'The domain name to validate (e.g., bondit.dk)')
 class DNSSECValidation(Resource):
-    @ns.doc('validate_domain')
-    @ns.expect()
-    @ns.response(200, 'Success - Domain validation completed', validation_result_model)
-    @ns.response(400, 'Bad Request - Invalid domain format')
-    @ns.response(429, 'Too Many Requests - Rate limit exceeded')
-    @ns.response(500, 'Internal Server Error - Validation failed')
+    @ns_validate.doc('validate_domain')
+    @ns_validate.expect()
+    @ns_validate.response(200, 'Success - Domain validation completed', validation_result_model)
+    @ns_validate.response(400, 'Bad Request - Invalid domain format')
+    @ns_validate.response(429, 'Too Many Requests - Rate limit exceeded')
+    @ns_validate.response(500, 'Internal Server Error - Validation failed')
     @limiter.limit(f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour")
     def get(self, domain):
         """
@@ -249,6 +271,133 @@ class DNSSECValidation(Resource):
                 'status': 'error',
                 'errors': [sanitize_error(e)]
             }, 500
+
+# Analytics endpoints
+@ns_analytics.route('/overview')
+class AnalyticsOverview(Resource):
+    @ns_analytics.doc('get_analytics_overview')
+    @ns_analytics.param('period', 'Time period: 1h, 24h, 7d, 30d', _in='query', default='24h')
+    @ns_analytics.response(200, 'Success - Analytics overview data', analytics_overview_model)
+    @limiter.limit(f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour")
+    def get(self):
+        """
+        Get analytics overview data
+        
+        Returns comprehensive analytics including request counts,
+        validation ratios, and top domains for the specified period.
+        """
+        try:
+            period = request.args.get('period', '24h')
+            
+            # Parse period
+            if period == '1h':
+                hours = 1
+                days = None
+            elif period == '24h':
+                hours = 24
+                days = None
+            elif period == '7d':
+                hours = None
+                days = 7
+            elif period == '30d':
+                hours = None
+                days = 30
+            else:
+                return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
+            
+            # Get analytics data
+            total_requests = RequestLog.get_requests_count(hours=hours, days=days)
+            api_requests = RequestLog.get_requests_count(hours=hours, days=days, source='api')
+            web_requests = RequestLog.get_requests_count(hours=hours, days=days, source='webapp')
+            validation_ratio = RequestLog.get_validation_ratio(days=days if days else 1)
+            top_domains = RequestLog.get_top_domains(limit=10, days=days if days else 1)
+            
+            return {
+                'total_requests': total_requests,
+                'api_requests': api_requests,
+                'web_requests': web_requests,
+                'validation_ratio': validation_ratio,
+                'top_domains': top_domains
+            }, 200
+            
+        except Exception as e:
+            logger.error(f"Analytics overview error: {str(e)}", exc_info=True)
+            return {'error': 'Failed to fetch analytics data'}, 500
+
+@ns_analytics.route('/timeseries')
+class AnalyticsTimeSeries(Resource):
+    @ns_analytics.doc('get_timeseries_data')
+    @ns_analytics.param('period', 'Time period: 1h, 24h, 7d, 30d', _in='query', default='24h')
+    @ns_analytics.response(200, 'Success - Time series data', timeseries_model)
+    @limiter.limit(f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour")
+    def get(self):
+        """
+        Get time series analytics data
+        
+        Returns hourly request counts for charting over the specified period.
+        """
+        try:
+            period = request.args.get('period', '24h')
+            
+            # Parse period
+            if period == '1h':
+                hours = 1
+            elif period == '24h':
+                hours = 24
+            elif period == '7d':
+                hours = 168  # 7 * 24
+            elif period == '30d':
+                hours = 720  # 30 * 24
+            else:
+                return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
+            
+            # Get hourly data
+            hourly_data = RequestLog.get_hourly_requests(hours=hours)
+            
+            # Format data for chart
+            chart_data = [{
+                'timestamp': timestamp,
+                'requests': count
+            } for timestamp, count in hourly_data]
+            
+            total_requests = sum(count for _, count in hourly_data)
+            
+            return {
+                'data': chart_data,
+                'period': period,
+                'total': total_requests
+            }, 200
+            
+        except Exception as e:
+            logger.error(f"Analytics timeseries error: {str(e)}", exc_info=True)
+            return {'error': 'Failed to fetch time series data'}, 500
+
+@ns_analytics.route('/sources')
+class AnalyticsSources(Resource):
+    @ns_analytics.doc('get_source_breakdown')
+    @ns_analytics.param('period', 'Time period in days', _in='query', type=int, default=7)
+    @ns_analytics.response(200, 'Success - Source breakdown data')
+    @limiter.limit(f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour")
+    def get(self):
+        """
+        Get breakdown of API vs webapp requests
+        
+        Returns the distribution of requests between API and web interface.
+        """
+        try:
+            days = request.args.get('period', 7, type=int)
+            source_data = RequestLog.get_source_breakdown(days=days)
+            
+            # Format for chart
+            breakdown = {}
+            for source, count in source_data:
+                breakdown[source] = count
+            
+            return breakdown, 200
+            
+        except Exception as e:
+            logger.error(f"Analytics sources error: {str(e)}", exc_info=True)
+            return {'error': 'Failed to fetch source breakdown'}, 500
 
 # Custom error handlers for rate limiting
 @app.errorhandler(429)
@@ -398,6 +547,12 @@ def health_simple():
 def index():
     """Serve the main web interface"""
     return render_template('index.html')
+
+@app.route('/stats')
+@limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
+def stats_dashboard():
+    """Serve the analytics dashboard"""
+    return render_template('stats.html')
 
 @app.route('/<string:domain>')
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")

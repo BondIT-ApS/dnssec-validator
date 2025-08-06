@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - DNSSEC Validator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .dashboard-title {
+            font-size: 2.5em;
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .dashboard-nav {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .nav-btn {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-btn:hover {
+            background: #2980b9;
+        }
+        
+        .time-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .time-btn {
+            padding: 8px 16px;
+            border: 2px solid #3498db;
+            background: white;
+            color: #3498db;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        
+        .time-btn.active, .time-btn:hover {
+            background: #3498db;
+            color: white;
+        }
+        
+        .refresh-btn {
+            padding: 8px 16px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #219a52;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-title {
+            font-size: 1.3em;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .chart-canvas {
+            position: relative;
+            height: 300px;
+        }
+        
+        .full-width-chart {
+            grid-column: 1 / -1;
+        }
+        
+        .top-domains {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .domains-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .domains-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .domains-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .domain-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .domain-count {
+            color: #3498db;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .dashboard-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .time-selector {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">📊 Analytics Dashboard</h1>
+            <div class="dashboard-nav">
+                <a href="/" class="nav-btn">🏠 DNSSEC Validator</a>
+                <a href="/api/docs/" class="nav-btn">📖 API Docs</a>
+            </div>
+        </div>
+        
+        <div class="time-selector">
+            <span style="color: #7f8c8d; font-weight: bold;">Time Period:</span>
+            <button class="time-btn active" data-period="1h">Last Hour</button>
+            <button class="time-btn" data-period="24h">Last 24 Hours</button>
+            <button class="time-btn" data-period="7d">Last 7 Days</button>
+            <button class="time-btn" data-period="30d">Last 30 Days</button>
+            <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Requests</div>
+                <div class="stat-number" id="total-requests">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">API Requests</div>
+                <div class="stat-number" id="api-requests">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Web Requests</div>
+                <div class="stat-number" id="web-requests">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-number" id="success-rate">-</div>
+            </div>
+        </div>
+        
+        <div class="charts-grid">
+            <div class="chart-container full-width-chart">
+                <div class="chart-title">Request Volume Over Time</div>
+                <div class="chart-canvas">
+                    <canvas id="timeseriesChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Request Sources</div>
+                <div class="chart-canvas">
+                    <canvas id="sourcesChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">DNSSEC Validation Results</div>
+                <div class="chart-canvas">
+                    <canvas id="validationChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="top-domains">
+            <div class="chart-title">Top Validated Domains</div>
+            <ul class="domains-list" id="top-domains-list">
+                <li class="loading">Loading domains...</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let currentPeriod = '1h';
+        let charts = {};
+        
+        // Initialize charts
+        function initCharts() {
+            // Time series chart
+            const timeseriesCtx = document.getElementById('timeseriesChart').getContext('2d');
+            charts.timeseries = new Chart(timeseriesCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Requests',
+                        data: [],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 12
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Sources pie chart
+            const sourcesCtx = document.getElementById('sourcesChart').getContext('2d');
+            charts.sources = new Chart(sourcesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['API', 'Web Interface'],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: ['#3498db', '#e74c3c']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // Validation results pie chart
+            const validationCtx = document.getElementById('validationChart').getContext('2d');
+            charts.validation = new Chart(validationCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Valid', 'Invalid', 'Error'],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: ['#27ae60', '#f39c12', '#e74c3c']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        // Format timestamp for display
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            if (currentPeriod === '1h') {
+                return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+            } else if (currentPeriod === '24h') {
+                return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+            } else {
+                return date.toLocaleDateString([], {month: 'short', day: 'numeric'}) + 
+                       ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+            }
+        }
+        
+        // Update analytics data
+        async function updateAnalytics() {
+            try {
+                // Show loading state
+                document.querySelectorAll('.stat-number').forEach(el => el.textContent = '-');
+                
+                // Fetch overview data
+                const overviewResponse = await fetch(`/api/analytics/overview?period=${currentPeriod}`);
+                const overviewData = await overviewResponse.json();
+                
+                if (overviewResponse.ok) {
+                    console.log('Overview data:', overviewData);
+                    
+                    // Update stats cards
+                    document.getElementById('total-requests').textContent = (overviewData.total_requests || 0).toLocaleString();
+                    document.getElementById('api-requests').textContent = (overviewData.api_requests || 0).toLocaleString();
+                    document.getElementById('web-requests').textContent = (overviewData.web_requests || 0).toLocaleString();
+                    
+                    const successRate = overviewData.validation_ratio && overviewData.validation_ratio.valid ? 
+                        overviewData.validation_ratio.valid.percentage : 0;
+                    document.getElementById('success-rate').textContent = successRate + '%';
+                    
+                    // Update validation chart
+                    if (overviewData.validation_ratio) {
+                        const validationData = overviewData.validation_ratio;
+                        charts.validation.data.datasets[0].data = [
+                            validationData.valid ? validationData.valid.count : 0,
+                            validationData.invalid ? validationData.invalid.count : 0,
+                            validationData.error ? validationData.error.count : 0
+                        ];
+                        charts.validation.update();
+                    }
+                    
+                    // Update top domains
+                    const domainsList = document.getElementById('top-domains-list');
+                    if (overviewData.top_domains && overviewData.top_domains.length > 0) {
+                        domainsList.innerHTML = overviewData.top_domains.map(([domain, count]) => `
+                            <li>
+                                <span class="domain-name">${domain}</span>
+                                <span class="domain-count">${count.toLocaleString()}</span>
+                            </li>
+                        `).join('');
+                    } else {
+                        domainsList.innerHTML = '<li style="text-align: center; color: #7f8c8d;">No data available</li>';
+                    }
+                } else {
+                    console.error('Failed to fetch overview data:', overviewResponse.status, overviewData);
+                }
+                
+                // Fetch time series data
+                const timeseriesResponse = await fetch(`/api/analytics/timeseries?period=${currentPeriod}`);
+                const timeseriesData = await timeseriesResponse.json();
+                
+                if (timeseriesResponse.ok && timeseriesData.data) {
+                    const labels = timeseriesData.data.map(item => formatTimestamp(item.timestamp));
+                    const data = timeseriesData.data.map(item => item.requests);
+                    
+                    charts.timeseries.data.labels = labels;
+                    charts.timeseries.data.datasets[0].data = data;
+                    charts.timeseries.update();
+                }
+                
+                // Fetch sources data
+                const sourcesResponse = await fetch(`/api/analytics/sources?period=7`);
+                const sourcesData = await sourcesResponse.json();
+                
+                if (sourcesResponse.ok) {
+                    charts.sources.data.datasets[0].data = [
+                        sourcesData.api || 0,
+                        sourcesData.webapp || 0
+                    ];
+                    charts.sources.update();
+                }
+                
+            } catch (error) {
+                console.error('Error updating analytics:', error);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.textContent = 'Error loading analytics data. Please try again.';
+                document.querySelector('.dashboard').prepend(errorDiv);
+                setTimeout(() => errorDiv.remove(), 5000);
+            }
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateAnalytics();
+            
+            // Time period selection
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentPeriod = this.dataset.period;
+                    updateAnalytics();
+                });
+            });
+            
+            // Refresh button
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                this.textContent = '🔄 Refreshing...';
+                updateAnalytics().finally(() => {
+                    this.textContent = '🔄 Refresh';
+                });
+            });
+            
+            // Auto-refresh every 30 seconds
+            setInterval(updateAnalytics, 30000);
+        });
+    </script>
+</body>
+</html>

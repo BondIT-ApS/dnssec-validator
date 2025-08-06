@@ -217,13 +217,27 @@ class InfluxDBLogger:
                 |> range(start: -{hours}h)
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
-                |> aggregateWindow(every: 1h, fn: sum, createEmpty: true)
-                |> fill(value: 0)
+                |> drop(columns: ["domain", "source", "dnssec_status", "ip_address", "_measurement", "_field"])
+                |> group()
+                |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)
+                |> yield()
             '''
             
             results = self._execute_query(flux_query)
-            return [(r.get('_time').strftime('%Y-%m-%d %H:00:00'), 
-                    int(r.get('_value', 0))) for r in results if r.get('_time')]
+            
+            # Process and deduplicate results by timestamp
+            time_buckets = {}
+            for r in results:
+                if r.get('_time'):
+                    timestamp_str = r.get('_time').strftime('%Y-%m-%d %H:00:00')
+                    value = int(r.get('_value', 0))
+                    if timestamp_str in time_buckets:
+                        time_buckets[timestamp_str] += value
+                    else:
+                        time_buckets[timestamp_str] = value
+            
+            # Sort by timestamp and return as list of tuples
+            return sorted(time_buckets.items())
             
         except Exception as e:
             print(f"Error getting hourly requests: {e}")
