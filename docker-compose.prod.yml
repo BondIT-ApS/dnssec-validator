@@ -1,0 +1,27 @@
+services:
+  dnssec-validator:
+    image: maboni82/dnssec-validator:latest
+    container_name: dnssec-validator-prod
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=production
+      - CORS_ORIGINS=https://dnssec-validator.bondit.dk
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.docker.compose.project=dnssec-validator"
+      - "maintainer=BondIT ApS"
+      - "version=1.0.0"
+    networks:
+      - dnssec-network
+
+networks:
+  dnssec-network:
+    driver: bridge
+    name: dnssec-validator-network

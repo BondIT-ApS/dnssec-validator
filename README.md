@@ -22,7 +22,13 @@ A **professional-grade** web-based DNSSEC validation tool that provides comprehe
 
 ## 🌐 Live Demo
 
-Try the live version at: [Coming Soon]
+🎉 **Try the live version at: [https://dnssec-validator.bondit.dk](https://dnssec-validator.bondit.dk)**
+
+The production deployment includes:
+- ✅ HTTPS with SSL/TLS encryption
+- ✅ Professional domain and hosting
+- ✅ High availability and monitoring
+- ✅ Full API documentation at `/api/docs/`
 
 ## 🐳 Quick Start with Docker
 
@@ -215,13 +221,12 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📋 Todo / Roadmap
 
-- [ ] Add support for CAA record validation
-- [ ] Implement TLSA record checking
-- [ ] Add DNS over HTTPS (DoH) support
-- [ ] Create batch validation API
-- [ ] Add monitoring and metrics
-- [ ] Implement caching for faster responses
-- [ ] Add support for internationalized domain names (IDN)
+- [ ] Add support for CAA record validation (#35)
+- [ ] Implement TLSA record checking (#34)
+- [ ] Create batch validation API (#32)
+- [ ] Add database for request logging and monitoring (#33)
+- [ ] Implement caching for faster responses (#36)
+- [ ] Add support for internationalized domain names (IDN) (#37)
 
 ## ⚠️ Security Considerations
 
