@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rate Limit Exceeded - DNSSEC Validator</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .rate-limit-container {
+            text-align: center;
+            padding: 2rem;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+        
+        .rate-limit-icon {
+            font-size: 3rem;
+            color: #856404;
+            margin-bottom: 1rem;
+        }
+        
+        .rate-limit-title {
+            color: #856404;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .rate-limit-message {
+            color: #664d03;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        
+        .countdown-timer {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #e17055;
+            margin: 1rem 0;
+            padding: 0.5rem;
+            background-color: #ffeaa7;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .retry-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 1rem;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+        
+        .retry-button:enabled {
+            opacity: 1;
+        }
+        
+        .retry-button:enabled:hover {
+            background-color: #2980b9;
+        }
+        
+        .api-info {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DNSSEC Validator</h1>
+        
+        <div class="rate-limit-container">
+            <div class="rate-limit-icon">⏱️</div>
+            <h2 class="rate-limit-title">Rate Limit Exceeded</h2>
+            
+            <div class="rate-limit-message">
+                <p>You've made too many requests in a short period of time.</p>
+                <p><strong>Current limit:</strong> {{ limit }}</p>
+                <p>Please wait before making your next request.</p>
+            </div>
+            
+            <div class="countdown-timer" id="countdown">
+                Please wait <span id="seconds">{{ retry_after }}</span> seconds
+            </div>
+            
+            <button class="retry-button" id="retryButton" disabled onclick="location.reload()">
+                Try Again
+            </button>
+        </div>
+        
+        <div class="api-info">
+            <h3>📱 For Programmatic Access</h3>
+            <p>If you're using our API programmatically, consider:</p>
+            <ul style="text-align: left;">
+                <li>Implementing exponential backoff in your code</li>
+                <li>Caching validation results to reduce API calls</li>
+                <li>Using the <code>Retry-After</code> header in responses</li>
+                <li>Spreading requests over time instead of bursting</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: center;">
+            <a href="/" style="color: #3498db; text-decoration: none;">← Back to DNSSEC Validator</a>
+            <span style="margin: 0 1rem; color: #ccc;">|</span>
+            <a href="/api/docs/" style="color: #3498db; text-decoration: none;">📚 API Documentation</a>
+        </div>
+    </div>
+    
+    <script>
+        // Countdown timer
+        let seconds = {{ retry_after }};
+        const countdownElement = document.getElementById('seconds');
+        const retryButton = document.getElementById('retryButton');
+        
+        const timer = setInterval(() => {
+            seconds--;
+            countdownElement.textContent = seconds;
+            
+            if (seconds <= 0) {
+                clearInterval(timer);
+                document.getElementById('countdown').textContent = 'You can now try again!';
+                document.getElementById('countdown').style.backgroundColor = '#d4edda';
+                document.getElementById('countdown').style.color = '#155724';
+                retryButton.disabled = false;
+            }
+        }, 1000);
+        
+        // Auto-redirect after countdown (optional)
+        setTimeout(() => {
+            if (document.hidden === false) {  // Only if page is visible
+                // Don't auto-redirect, let user choose
+            }
+        }, {{ retry_after * 1000 }});
+    </script>
+</body>
+</html>

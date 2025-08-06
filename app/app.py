@@ -6,6 +6,7 @@ from flask_restx import Api, Resource, fields
 from flask_talisman import Talisman
 import logging
 import os
+from datetime import datetime, timezone
 
 from dnssec_validator import DNSSECValidator
 
@@ -24,10 +25,23 @@ Talisman(
     }
 )
 
+# Rate limiting configuration from environment variables
+def get_rate_limits():
+    return {
+        'global_day': os.getenv('RATE_LIMIT_GLOBAL_DAY', '200'),
+        'global_hour': os.getenv('RATE_LIMIT_GLOBAL_HOUR', '50'), 
+        'api_minute': os.getenv('RATE_LIMIT_API_MINUTE', '10'),
+        'api_hour': os.getenv('RATE_LIMIT_API_HOUR', '100'),
+        'web_minute': os.getenv('RATE_LIMIT_WEB_MINUTE', '20'),
+        'web_hour': os.getenv('RATE_LIMIT_WEB_HOUR', '200')
+    }
+
+rate_limits = get_rate_limits()
+
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"]
+    default_limits=[f"{rate_limits['global_day']} per day", f"{rate_limits['global_hour']} per hour"]
 )
 
 # Configure logging
@@ -120,7 +134,7 @@ class DNSSECValidation(Resource):
     @ns.response(400, 'Bad Request - Invalid domain format')
     @ns.response(429, 'Too Many Requests - Rate limit exceeded')
     @ns.response(500, 'Internal Server Error - Validation failed')
-    @limiter.limit("10 per minute")
+    @limiter.limit(f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour")
     def get(self, domain):
         """
         Validate DNSSEC configuration for a domain
@@ -154,13 +168,60 @@ class DNSSECValidation(Resource):
                 'errors': [sanitize_error(e)]
             }, 500
 
+# Custom error handlers for rate limiting
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Handle rate limit exceeded errors with user-friendly responses"""
+    
+    # Calculate retry after time
+    retry_after = getattr(e, 'retry_after', 60)
+    reset_time = datetime.now(timezone.utc)
+    if retry_after:
+        reset_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        if retry_after > 60:
+            reset_time = reset_time.replace(minute=0) 
+        reset_time = reset_time.timestamp() + retry_after
+    
+    # Add rate limiting headers
+    def add_rate_limit_headers(response):
+        response.headers['Retry-After'] = str(int(retry_after))
+        response.headers['X-RateLimit-Reset'] = str(int(reset_time))
+        return response
+    
+    if request.path.startswith('/api/'):
+        # API JSON response
+        response = jsonify({
+            'error': {
+                'code': 'RATE_LIMIT_EXCEEDED',
+                'message': 'API rate limit exceeded',
+                'details': {
+                    'limit': str(e.description),
+                    'retry_after': int(retry_after),
+                    'reset_time': datetime.fromtimestamp(reset_time, tz=timezone.utc).isoformat()
+                }
+            }
+        })
+        response.status_code = 429
+        return add_rate_limit_headers(response)
+    else:
+        # Web interface friendly error page
+        response = render_template('rate_limit.html', 
+                                 limit=str(e.description),
+                                 retry_after=int(retry_after),
+                                 reset_time=datetime.fromtimestamp(reset_time, tz=timezone.utc).strftime('%H:%M:%S UTC'))
+        response = app.make_response(response)
+        response.status_code = 429
+        return add_rate_limit_headers(response)
+
 # Traditional Flask routes for web interface
 @app.route('/')
+@limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def index():
     """Serve the main web interface"""
     return render_template('index.html')
 
 @app.route('/<string:domain>')
+@limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def check_domain_direct(domain):
     """Direct access like /bondit.dk - render page with pre-filled domain"""
     return render_template('index.html', domain=domain)
