@@ -99,11 +99,20 @@ def log_request(response):
             # Direct domain access like /bondit.dk
             domain = request.path.lstrip('/')
         
+        # Determine if this is an internal request (analytics, stats, etc.)
+        internal_paths = [
+            '/api/analytics/',
+            '/stats',
+            '/health',
+            '/api/docs',
+        ]
+        is_internal = any(request.path.startswith(path) for path in internal_paths)
+        
         # Get DNSSEC status from response if available
         dnssec_status = 'unknown'
         if hasattr(g, 'dnssec_status'):
             dnssec_status = g.dnssec_status
-        elif response.status_code == 200 and source == 'api':
+        elif response.status_code == 200 and source == 'api' and not is_internal:
             # Try to parse status from response JSON
             try:
                 if response.is_json:
@@ -115,14 +124,20 @@ def log_request(response):
         elif response.status_code >= 400:
             dnssec_status = 'error'
         
-        # Log the request
-        RequestLog.log_request(
+        # For internal requests, set appropriate dnssec_status
+        if is_internal:
+            dnssec_status = 'internal'
+        
+        # Log the request with internal flag
+        from models import influx_logger
+        influx_logger.log_request(
             ip_address=get_client_ip(),
             domain=domain,
             http_status=response.status_code,
             dnssec_status=dnssec_status,
             source=source,
             user_agent=request.headers.get('User-Agent', ''),
+            internal=is_internal,
         )
         
     except Exception as e:
@@ -305,12 +320,12 @@ class AnalyticsOverview(Resource):
             else:
                 return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
             
-            # Get analytics data
-            total_requests = RequestLog.get_requests_count(hours=hours, days=days)
-            api_requests = RequestLog.get_requests_count(hours=hours, days=days, source='api')
-            web_requests = RequestLog.get_requests_count(hours=hours, days=days, source='webapp')
-            validation_ratio = RequestLog.get_validation_ratio(days=days if days else 1)
-            top_domains = RequestLog.get_top_domains(limit=10, days=days if days else 1)
+            # Get analytics data (external requests only for stats dashboard)
+            total_requests = RequestLog.get_external_requests_count(hours=hours, days=days)
+            api_requests = RequestLog.get_external_requests_count(hours=hours, days=days, source='api')
+            web_requests = RequestLog.get_external_requests_count(hours=hours, days=days, source='webapp')
+            validation_ratio = RequestLog.get_external_validation_ratio(days=days if days else 1)
+            top_domains = RequestLog.get_external_top_domains(limit=10, days=days if days else 1)
             
             return {
                 'total_requests': total_requests,
@@ -351,8 +366,8 @@ class AnalyticsTimeSeries(Resource):
             else:
                 return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
             
-            # Get hourly data
-            hourly_data = RequestLog.get_hourly_requests(hours=hours)
+            # Get hourly data (external requests only for stats dashboard)
+            hourly_data = RequestLog.get_external_hourly_requests(hours=hours)
             
             # Format data for chart
             chart_data = [{

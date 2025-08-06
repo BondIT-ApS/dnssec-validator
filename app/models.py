@@ -65,7 +65,8 @@ class InfluxDBLogger:
         return self._query_api
     
     def log_request(self, ip_address: str, domain: str, http_status: int, 
-                   dnssec_status: str, source: str, user_agent: str = None) -> bool:
+                   dnssec_status: str, source: str, user_agent: str = None, 
+                   internal: bool = False) -> bool:
         """Log a request to InfluxDB"""
         try:
             if not self.write_api:
@@ -79,6 +80,7 @@ class InfluxDBLogger:
                 .tag("source", source)
                 .tag("dnssec_status", dnssec_status)
                 .tag("ip_address", ip_address)
+                .tag("internal", str(internal).lower())  # Add internal tag
                 .field("http_status", http_status)
                 .field("count", 1)
             )
@@ -114,7 +116,8 @@ class InfluxDBLogger:
             print(f"Error executing query: {e}")
             return []
     
-    def get_requests_count(self, hours: int = None, days: int = None, source: str = None) -> int:
+    def get_requests_count(self, hours: int = None, days: int = None, source: str = None, 
+                          include_internal: bool = True) -> int:
         """Get request count for specified time period"""
         try:
             # Build time range
@@ -133,6 +136,10 @@ class InfluxDBLogger:
                 |> filter(fn: (r) => r._field == "count")
             '''
             
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
             # Add source filter if specified
             if source:
                 flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
@@ -147,7 +154,7 @@ class InfluxDBLogger:
             print(f"Error getting requests count: {e}")
             return 0
     
-    def get_top_domains(self, limit: int = 20, days: int = None) -> List[tuple]:
+    def get_top_domains(self, limit: int = 20, days: int = None, include_internal: bool = True) -> List[tuple]:
         """Get most frequently validated domains"""
         try:
             time_range = f"-{days}d" if days else "-30d"
@@ -157,6 +164,13 @@ class InfluxDBLogger:
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
+            '''
+            
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
+            flux_query += f'''
                 |> group(columns: ["domain"])
                 |> sum()
                 |> group()
@@ -171,7 +185,7 @@ class InfluxDBLogger:
             print(f"Error getting top domains: {e}")
             return []
     
-    def get_validation_ratio(self, days: int = None) -> Dict[str, Any]:
+    def get_validation_ratio(self, days: int = None, include_internal: bool = True) -> Dict[str, Any]:
         """Get ratio of valid vs invalid vs error validations"""
         try:
             time_range = f"-{days}d" if days else "-30d"
@@ -181,9 +195,13 @@ class InfluxDBLogger:
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
-                |> group(columns: ["dnssec_status"])
-                |> sum()
             '''
+            
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
+            flux_query += '|> group(columns: ["dnssec_status"]) |> sum()'
             
             results = self._execute_query(flux_query)
             
@@ -209,7 +227,7 @@ class InfluxDBLogger:
             print(f"Error getting validation ratio: {e}")
             return {'total': 0}
     
-    def get_hourly_requests(self, hours: int = 24) -> List[tuple]:
+    def get_hourly_requests(self, hours: int = 24, include_internal: bool = True) -> List[tuple]:
         """Get hourly request counts for charts"""
         try:
             flux_query = f'''
@@ -217,6 +235,13 @@ class InfluxDBLogger:
                 |> range(start: -{hours}h)
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
+            '''
+            
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
+            flux_query += '''
                 |> drop(columns: ["domain", "source", "dnssec_status", "ip_address", "_measurement", "_field"])
                 |> group()
                 |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)
@@ -312,3 +337,20 @@ class RequestLog:
     @classmethod
     def cleanup_old_logs(cls, days: int = None) -> int:
         return influx_logger.cleanup_old_logs(days)
+    
+    # External-only methods for stats dashboard (filters out internal requests)
+    @classmethod
+    def get_external_requests_count(cls, hours: int = None, days: int = None, source: str = None) -> int:
+        return influx_logger.get_requests_count(hours, days, source, include_internal=False)
+    
+    @classmethod
+    def get_external_top_domains(cls, limit: int = 20, days: int = None) -> List[tuple]:
+        return influx_logger.get_top_domains(limit, days, include_internal=False)
+    
+    @classmethod
+    def get_external_validation_ratio(cls, days: int = None) -> Dict[str, Any]:
+        return influx_logger.get_validation_ratio(days, include_internal=False)
+    
+    @classmethod
+    def get_external_hourly_requests(cls, hours: int = 24) -> List[tuple]:
+        return influx_logger.get_hourly_requests(hours, include_internal=False)
