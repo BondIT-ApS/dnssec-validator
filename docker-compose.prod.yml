@@ -21,7 +21,9 @@ services:
       # Database logging configuration
       - REQUEST_LOGGING_ENABLED=true
       - LOG_RETENTION_DAYS=30
-      - DATABASE_URL=sqlite:///dnssec_validator.db
+      - DATABASE_URL=sqlite:///data/dnssec_validator.db
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/simple"]

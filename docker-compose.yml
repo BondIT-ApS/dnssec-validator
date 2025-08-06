@@ -1,4 +1,27 @@
 services:
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: dnssec-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
+      - DOCKER_INFLUXDB_INIT_ORG=dnssec-validator
+      - DOCKER_INFLUXDB_INIT_BUCKET=requests
+      - DOCKER_INFLUXDB_INIT_RETENTION=90d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+    volumes:
+      - influx_data:/var/lib/influxdb2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   dnssec-validator:
     build: .
     ports:
@@ -18,12 +41,16 @@ services:
       - HEALTH_CHECK_ENABLED=true
       - HEALTH_CHECK_DNS_TEST=true
       - HEALTH_CHECK_MEMORY_THRESHOLD=90
-      # Database logging configuration
+      # InfluxDB logging configuration
       - REQUEST_LOGGING_ENABLED=true
-      - LOG_RETENTION_DAYS=90
-      - DATABASE_URL=sqlite:///dnssec_validator.db
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=my-super-secret-auth-token
+      - INFLUX_ORG=dnssec-validator
+      - INFLUX_BUCKET=requests
     volumes:
       - ./app:/app
+    depends_on:
+      - influxdb
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/simple"]
@@ -31,3 +58,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+volumes:
+  influx_data:

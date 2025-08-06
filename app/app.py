@@ -11,16 +11,9 @@ import psutil
 from datetime import datetime, timezone
 
 from dnssec_validator import DNSSECValidator
-from models import db, RequestLog
+from models import RequestLog
 
 app = Flask(__name__)
-
-# Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///dnssec_validator.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Initialize database
-db.init_app(app)
 
 # Track application startup time for uptime calculation
 app_start_time = time.time()
@@ -60,19 +53,6 @@ limiter = Limiter(
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Database initialization
-def create_tables():
-    """Create database tables"""
-    try:
-        db.create_all()
-        logger.info("Database tables created successfully")
-    except Exception as e:
-        logger.error(f"Error creating database tables: {e}")
-
-# Initialize database tables when app starts
-with app.app_context():
-    create_tables()
 
 # Request logging functionality
 def get_client_ip():
