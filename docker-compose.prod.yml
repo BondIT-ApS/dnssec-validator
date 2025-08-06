@@ -7,9 +7,20 @@ services:
     environment:
       - FLASK_ENV=production
       - CORS_ORIGINS=https://dnssec-validator.bondit.dk
+      # Rate limiting configuration for production
+      - RATE_LIMIT_GLOBAL_DAY=1000   # Global requests per IP per day
+      - RATE_LIMIT_GLOBAL_HOUR=100   # Global requests per IP per hour
+      - RATE_LIMIT_API_MINUTE=5      # API requests per IP per minute
+      - RATE_LIMIT_API_HOUR=50       # API requests per IP per hour
+      - RATE_LIMIT_WEB_MINUTE=10     # Web interface requests per IP per minute
+      - RATE_LIMIT_WEB_HOUR=100      # Web interface requests per IP per hour
+      # Health check configuration
+      - HEALTH_CHECK_ENABLED=true
+      - HEALTH_CHECK_DNS_TEST=true
+      - HEALTH_CHECK_MEMORY_THRESHOLD=90
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/')"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/simple')"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -6,11 +6,16 @@ from flask_restx import Api, Resource, fields
 from flask_talisman import Talisman
 import logging
 import os
+import time
+import psutil
 from datetime import datetime, timezone
 
 from dnssec_validator import DNSSECValidator
 
 app = Flask(__name__)
+
+# Track application startup time for uptime calculation
+app_start_time = time.time()
 
 # Security enhancements
 CORS(app, origins=os.getenv('CORS_ORIGINS', 'http://localhost:8080').split(','))
@@ -212,6 +217,103 @@ def ratelimit_handler(e):
         response = app.make_response(response)
         response.status_code = 429
         return add_rate_limit_headers(response)
+
+# Health check helper functions
+def get_uptime():
+    """Calculate application uptime in a human-readable format"""
+    uptime_seconds = int(time.time() - app_start_time)
+    
+    days = uptime_seconds // 86400
+    hours = (uptime_seconds % 86400) // 3600
+    minutes = (uptime_seconds % 3600) // 60
+    seconds = uptime_seconds % 60
+    
+    if days > 0:
+        return f"{days}d {hours}h {minutes}m {seconds}s"
+    elif hours > 0:
+        return f"{hours}h {minutes}m {seconds}s"
+    elif minutes > 0:
+        return f"{minutes}m {seconds}s"
+    else:
+        return f"{seconds}s"
+
+def check_dns_resolver():
+    """Test DNS resolution capability"""
+    try:
+        import dns.resolver
+        resolver = dns.resolver.Resolver()
+        resolver.resolve('example.com', 'A')
+        return 'ok'
+    except Exception as e:
+        logger.warning(f"DNS resolver check failed: {str(e)}")
+        return 'error'
+
+def check_memory_usage():
+    """Check memory usage and return status"""
+    try:
+        memory_percent = psutil.virtual_memory().percent
+        threshold = int(os.getenv('HEALTH_CHECK_MEMORY_THRESHOLD', '90'))
+        
+        if memory_percent < threshold:
+            return 'ok'
+        else:
+            return 'warning'
+    except Exception as e:
+        logger.warning(f"Memory check failed: {str(e)}")
+        return 'error'
+
+# Health check endpoints (exempt from rate limiting)
+@app.route('/health')
+@limiter.exempt
+def health_check():
+    """Dedicated health check endpoint with detailed information"""
+    try:
+        health_status = {
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'version': '1.0.0',
+            'checks': {},
+            'uptime': get_uptime()
+        }
+        
+        # Check if detailed health checks are enabled
+        health_enabled = os.getenv('HEALTH_CHECK_ENABLED', 'true').lower() == 'true'
+        
+        if health_enabled:
+            # Test DNS resolution capability if enabled
+            if os.getenv('HEALTH_CHECK_DNS_TEST', 'true').lower() == 'true':
+                dns_status = check_dns_resolver()
+                health_status['checks']['dns_resolver'] = dns_status
+                if dns_status == 'error':
+                    health_status['status'] = 'degraded'
+            
+            # Check memory usage
+            memory_status = check_memory_usage()
+            health_status['checks']['memory_usage'] = memory_status
+            if memory_status in ['warning', 'error']:
+                health_status['status'] = 'degraded' if health_status['status'] == 'healthy' else health_status['status']
+        
+        # Application is running if we got this far
+        health_status['checks']['application'] = 'ok'
+        
+        # Determine HTTP status code
+        status_code = 200 if health_status['status'] in ['healthy', 'degraded'] else 503
+        
+        return jsonify(health_status), status_code
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'unhealthy',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'error': 'Health check system failure'
+        }), 503
+
+@app.route('/health/simple')
+@limiter.exempt
+def health_simple():
+    """Simple health check for basic monitoring"""
+    return 'healthy', 200
 
 # Traditional Flask routes for web interface
 @app.route('/')

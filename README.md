@@ -68,6 +68,8 @@ Open your browser to `http://localhost:8080`
 
 ### API Usage
 
+#### DNSSEC Validation
+
 ```bash
 # Validate a domain via API
 curl "http://localhost:8080/api/validate/bondit.dk"
@@ -103,6 +105,37 @@ curl "http://localhost:8080/api/validate/bondit.dk"
   }
 }
 ```
+
+#### Health Check Endpoints
+
+The application provides dedicated health check endpoints for monitoring and container orchestration:
+
+```bash
+# Detailed health check (JSON response)
+curl "http://localhost:8080/health"
+
+# Response format
+{
+  "status": "healthy",
+  "timestamp": "2025-08-06T07:23:12Z",
+  "version": "1.0.0",
+  "checks": {
+    "application": "ok",
+    "dns_resolver": "ok",
+    "memory_usage": "ok"
+  },
+  "uptime": "2h 15m 32s"
+}
+
+# Simple health check (plain text response)
+curl "http://localhost:8080/health/simple"
+# Response: "healthy"
+```
+
+**Health Status Levels:**
+- `healthy`: All systems operational (HTTP 200)
+- `degraded`: Some non-critical issues detected (HTTP 200) 
+- `unhealthy`: Critical issues affecting functionality (HTTP 503)
 
 ## 🏗️ Architecture
 
@@ -321,6 +354,93 @@ RATE_LIMIT_API_MINUTE=30
 RATE_LIMIT_API_HOUR=1000
 RATE_LIMIT_WEB_MINUTE=50
 RATE_LIMIT_WEB_HOUR=1000
+```
+
+## 🏥 Health Monitoring
+
+The DNSSEC Validator includes comprehensive health monitoring capabilities designed for container orchestration and monitoring systems.
+
+### Health Check Endpoints
+
+| Endpoint | Purpose | Response Format | Rate Limited |
+|----------|---------|-----------------|-------------|
+| `/health` | Detailed health status | JSON | No |
+| `/health/simple` | Basic health check | Plain text | No |
+
+### Health Check Configuration
+
+Health monitoring behavior can be customized using environment variables:
+
+```bash
+# Health check configuration
+HEALTH_CHECK_ENABLED=true          # Enable/disable detailed health checks
+HEALTH_CHECK_DNS_TEST=true         # Test DNS resolution capability
+HEALTH_CHECK_MEMORY_THRESHOLD=90   # Memory usage warning threshold (%)
+```
+
+### Docker Health Check Integration
+
+Both Docker Compose configurations include health checks:
+
+**Development (docker-compose.yml):**
+```yaml
+healthcheck:
+  test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/simple')"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 60s
+```
+
+**Production (docker-compose.prod.yml):**
+```yaml
+healthcheck:
+  test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/simple')"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 60s
+```
+
+### Health Check Components
+
+The detailed health endpoint (`/health`) monitors:
+
+1. **Application Status**: Basic Flask app responsiveness
+2. **DNS Resolver**: Tests ability to resolve DNS queries (`example.com`)
+3. **Memory Usage**: Monitors system memory consumption
+4. **Uptime**: Tracks application runtime since startup
+
+### Container Orchestration Benefits
+
+- **Portainer**: Visual health status indicators in container overview
+- **Docker Swarm**: Automatic container replacement on health failures
+- **Kubernetes**: Readiness and liveness probe compatibility
+- **Load Balancers**: Health-based traffic routing decisions
+- **Monitoring Tools**: Integration with Prometheus, Grafana, etc.
+
+### Monitoring Integration Examples
+
+**Prometheus scraping configuration:**
+```yaml
+scrape_configs:
+  - job_name: 'dnssec-validator'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: '/health'
+    scrape_interval: 30s
+```
+
+**Kubernetes liveness probe:**
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health/simple
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
 ```
 
 ## ⚠️ Security Considerations
