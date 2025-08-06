@@ -385,7 +385,7 @@ Both Docker Compose configurations include health checks:
 **Development (docker-compose.yml):**
 ```yaml
 healthcheck:
-  test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/simple')"]
+  test: ["CMD", "curl", "-f", "http://localhost:8080/health/simple"]
   interval: 30s
   timeout: 10s
   retries: 3
@@ -395,7 +395,7 @@ healthcheck:
 **Production (docker-compose.prod.yml):**
 ```yaml
 healthcheck:
-  test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/simple')"]
+  test: ["CMD", "curl", "-f", "http://localhost:8080/health/simple"]
   interval: 30s
   timeout: 10s
   retries: 3
