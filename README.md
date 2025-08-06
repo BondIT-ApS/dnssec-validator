@@ -221,12 +221,12 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📋 Todo / Roadmap
 
-- [ ] Add support for CAA record validation (#35)
-- [ ] Implement TLSA record checking (#34)
-- [ ] Create batch validation API (#32)
-- [ ] Add database for request logging and monitoring (#33)
-- [ ] Implement caching for faster responses (#36)
-- [ ] Add support for internationalized domain names (IDN) (#37)
+- [ ] [Add support for CAA record validation](https://github.com/BondIT-ApS/dnssec-validator/issues/35)
+- [ ] [Implement TLSA record checking](https://github.com/BondIT-ApS/dnssec-validator/issues/34)
+- [ ] [Create batch validation API](https://github.com/BondIT-ApS/dnssec-validator/issues/32)
+- [ ] [Add database for request logging and monitoring](https://github.com/BondIT-ApS/dnssec-validator/issues/33)
+- [ ] [Implement caching for faster responses](https://github.com/BondIT-ApS/dnssec-validator/issues/36)
+- [ ] [Add support for internationalized domain names (IDN)](https://github.com/BondIT-ApS/dnssec-validator/issues/37)
 
 ## ⚠️ Security Considerations
 
@@ -247,7 +247,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🏢 About BondIT ApS
 
-This project is maintained and developed by [BondIT ApS](https://bondit.dk), a Scandinavian IT consultancy specializing in secure web applications and infrastructure solutions. We are passionate about building robust, scalable software that prioritizes security and reliability.
+This project is maintained and developed by [BondIT ApS](https://bondit.dk), a Scandinavian IT consultancy specializing in secure web applications and infrastructure solutions. Just like our fellow Danish company LEGO, we believe in building things one brick at a time – except our bricks are lines of code, and instead of stepping on them barefoot at 3 AM, you'll actually enjoy using what we build! 🧱💻
 
 ---
 
