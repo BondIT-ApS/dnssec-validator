@@ -65,7 +65,8 @@ class InfluxDBLogger:
         return self._query_api
     
     def log_request(self, ip_address: str, domain: str, http_status: int, 
-                   dnssec_status: str, source: str, user_agent: str = None) -> bool:
+                   dnssec_status: str, source: str, user_agent: str = None, 
+                   internal: bool = False) -> bool:
         """Log a request to InfluxDB"""
         try:
             if not self.write_api:
@@ -79,6 +80,7 @@ class InfluxDBLogger:
                 .tag("source", source)
                 .tag("dnssec_status", dnssec_status)
                 .tag("ip_address", ip_address)
+                .tag("internal", str(internal).lower())  # Add internal tag
                 .field("http_status", http_status)
                 .field("count", 1)
             )
@@ -114,7 +116,8 @@ class InfluxDBLogger:
             print(f"Error executing query: {e}")
             return []
     
-    def get_requests_count(self, hours: int = None, days: int = None, source: str = None) -> int:
+    def get_requests_count(self, hours: int = None, days: int = None, source: str = None, 
+                          include_internal: bool = True) -> int:
         """Get request count for specified time period"""
         try:
             # Build time range
@@ -133,6 +136,10 @@ class InfluxDBLogger:
                 |> filter(fn: (r) => r._field == "count")
             '''
             
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
             # Add source filter if specified
             if source:
                 flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
@@ -147,7 +154,7 @@ class InfluxDBLogger:
             print(f"Error getting requests count: {e}")
             return 0
     
-    def get_top_domains(self, limit: int = 20, days: int = None) -> List[tuple]:
+    def get_top_domains(self, limit: int = 20, days: int = None, include_internal: bool = True) -> List[tuple]:
         """Get most frequently validated domains"""
         try:
             time_range = f"-{days}d" if days else "-30d"
@@ -157,6 +164,13 @@ class InfluxDBLogger:
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
+            '''
+            
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
+            flux_query += f'''
                 |> group(columns: ["domain"])
                 |> sum()
                 |> group()
@@ -171,7 +185,7 @@ class InfluxDBLogger:
             print(f"Error getting top domains: {e}")
             return []
     
-    def get_validation_ratio(self, days: int = None) -> Dict[str, Any]:
+    def get_validation_ratio(self, days: int = None, include_internal: bool = True) -> Dict[str, Any]:
         """Get ratio of valid vs invalid vs error validations"""
         try:
             time_range = f"-{days}d" if days else "-30d"
@@ -181,9 +195,13 @@ class InfluxDBLogger:
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
-                |> group(columns: ["dnssec_status"])
-                |> sum()
             '''
+            
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
+            flux_query += '|> group(columns: ["dnssec_status"]) |> sum()'
             
             results = self._execute_query(flux_query)
             
@@ -209,7 +227,7 @@ class InfluxDBLogger:
             print(f"Error getting validation ratio: {e}")
             return {'total': 0}
     
-    def get_hourly_requests(self, hours: int = 24) -> List[tuple]:
+    def get_hourly_requests(self, hours: int = 24, include_internal: bool = True) -> List[tuple]:
         """Get hourly request counts for charts"""
         try:
             flux_query = f'''
@@ -217,13 +235,34 @@ class InfluxDBLogger:
                 |> range(start: -{hours}h)
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
-                |> aggregateWindow(every: 1h, fn: sum, createEmpty: true)
-                |> fill(value: 0)
+            '''
+            
+            # Filter out internal requests for stats dashboard
+            if not include_internal:
+                flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
+            flux_query += '''
+                |> drop(columns: ["domain", "source", "dnssec_status", "ip_address", "_measurement", "_field"])
+                |> group()
+                |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)
+                |> yield()
             '''
             
             results = self._execute_query(flux_query)
-            return [(r.get('_time').strftime('%Y-%m-%d %H:00:00'), 
-                    int(r.get('_value', 0))) for r in results if r.get('_time')]
+            
+            # Process and deduplicate results by timestamp
+            time_buckets = {}
+            for r in results:
+                if r.get('_time'):
+                    timestamp_str = r.get('_time').strftime('%Y-%m-%d %H:00:00')
+                    value = int(r.get('_value', 0))
+                    if timestamp_str in time_buckets:
+                        time_buckets[timestamp_str] += value
+                    else:
+                        time_buckets[timestamp_str] = value
+            
+            # Sort by timestamp and return as list of tuples
+            return sorted(time_buckets.items())
             
         except Exception as e:
             print(f"Error getting hourly requests: {e}")
@@ -256,6 +295,126 @@ class InfluxDBLogger:
         # This is mainly for compatibility with the CLI interface
         print(f"InfluxDB retention is handled automatically. Configured for {days or '90'} days.")
         return 0
+    
+    def truncate_database(self) -> bool:
+        """Truncate all data from the bucket (dangerous operation)"""
+        try:
+            if not self.client:
+                print("InfluxDB client not available")
+                return False
+            
+            # Delete all data from bucket using delete API
+            from datetime import datetime, timezone
+            import urllib.parse
+            
+            # Get the delete API
+            delete_api = self.client.delete_api()
+            
+            # Delete all data from the bucket (from beginning of time to now)
+            start_time = datetime(1970, 1, 1, tzinfo=timezone.utc)
+            stop_time = datetime.now(timezone.utc)
+            
+            delete_api.delete(
+                start=start_time,
+                stop=stop_time,
+                bucket=self.bucket,
+                org=self.org
+            )
+            
+            print(f"Successfully truncated all data from bucket '{self.bucket}'")
+            return True
+            
+        except Exception as e:
+            print(f"Error truncating database: {e}")
+            return False
+    
+    def recreate_database(self, version: str = None) -> bool:
+        """Recreate the database/bucket with optional version tagging"""
+        try:
+            if not self.client:
+                print("InfluxDB client not available")
+                return False
+            
+            # Get the buckets API
+            buckets_api = self.client.buckets_api()
+            
+            try:
+                # Try to get existing bucket
+                existing_bucket = buckets_api.find_bucket_by_name(self.bucket)
+                if existing_bucket:
+                    print(f"Found existing bucket '{self.bucket}', deleting...")
+                    buckets_api.delete_bucket(existing_bucket)
+                    print(f"Deleted bucket '{self.bucket}'")
+            except Exception as e:
+                print(f"Bucket '{self.bucket}' not found or already deleted: {e}")
+            
+            # Create new bucket
+            from influxdb_client import BucketRetentionRules
+            
+            # Set up retention rules (default 90 days)
+            retention_rules = BucketRetentionRules(
+                type="expire",
+                every_seconds=90 * 24 * 60 * 60  # 90 days in seconds
+            )
+            
+            # Create bucket description with version if provided
+            description = f"DNSSEC Validator request logs"
+            if version:
+                description += f" (Schema version: {version})"
+            
+            new_bucket = buckets_api.create_bucket(
+                bucket_name=self.bucket,
+                retention_rules=retention_rules,
+                org=self.org,
+                description=description
+            )
+            
+            print(f"Successfully recreated bucket '{self.bucket}' with ID: {new_bucket.id}")
+            if version:
+                print(f"Schema version: {version}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error recreating database: {e}")
+            return False
+    
+    def get_database_info(self) -> Dict[str, Any]:
+        """Get information about the current database/bucket"""
+        try:
+            if not self.client:
+                return {'error': 'InfluxDB client not available'}
+            
+            buckets_api = self.client.buckets_api()
+            bucket = buckets_api.find_bucket_by_name(self.bucket)
+            
+            if not bucket:
+                return {'error': f'Bucket {self.bucket} not found'}
+            
+            # Get bucket statistics
+            info = {
+                'bucket_name': bucket.name,
+                'bucket_id': bucket.id,
+                'description': bucket.description,
+                'created_at': bucket.created_at.isoformat() if bucket.created_at else None,
+                'updated_at': bucket.updated_at.isoformat() if bucket.updated_at else None,
+                'retention_rules': [],
+                'org': self.org
+            }
+            
+            # Add retention rules info
+            if bucket.retention_rules:
+                for rule in bucket.retention_rules:
+                    info['retention_rules'].append({
+                        'type': rule.type,
+                        'every_seconds': rule.every_seconds,
+                        'days': rule.every_seconds // (24 * 60 * 60) if rule.every_seconds else None
+                    })
+            
+            return info
+            
+        except Exception as e:
+            return {'error': f'Error getting database info: {e}'}
     
     def close(self):
         """Close InfluxDB client connection"""
@@ -298,3 +457,20 @@ class RequestLog:
     @classmethod
     def cleanup_old_logs(cls, days: int = None) -> int:
         return influx_logger.cleanup_old_logs(days)
+    
+    # External-only methods for stats dashboard (filters out internal requests)
+    @classmethod
+    def get_external_requests_count(cls, hours: int = None, days: int = None, source: str = None) -> int:
+        return influx_logger.get_requests_count(hours, days, source, include_internal=False)
+    
+    @classmethod
+    def get_external_top_domains(cls, limit: int = 20, days: int = None) -> List[tuple]:
+        return influx_logger.get_top_domains(limit, days, include_internal=False)
+    
+    @classmethod
+    def get_external_validation_ratio(cls, days: int = None) -> Dict[str, Any]:
+        return influx_logger.get_validation_ratio(days, include_internal=False)
+    
+    @classmethod
+    def get_external_hourly_requests(cls, hours: int = 24) -> List[tuple]:
+        return influx_logger.get_hourly_requests(hours, include_internal=False)
