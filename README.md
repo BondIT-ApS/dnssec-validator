@@ -228,12 +228,109 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - [ ] [Implement caching for faster responses](https://github.com/BondIT-ApS/dnssec-validator/issues/36)
 - [ ] [Add support for internationalized domain names (IDN)](https://github.com/BondIT-ApS/dnssec-validator/issues/37)
 
+## 🛡️ Rate Limiting
+
+The DNSSEC Validator includes comprehensive rate limiting to ensure fair usage and prevent abuse. Rate limits are applied per IP address and are configurable via environment variables.
+
+### Default Rate Limits
+
+| Endpoint Type | Limit | Description |
+|---------------|-------|-------------|
+| **Global** | 5000/day, 500/hour | Overall requests per IP across all endpoints |
+| **API** | 100/minute, 1000/hour | REST API endpoints (`/api/validate/*`) |
+| **Web Interface** | 50/minute, 500/hour | Web UI and direct domain URLs |
+
+### Configuration
+
+Rate limits can be customized using environment variables:
+
+```bash
+# Global rate limits (applied to all requests)
+RATE_LIMIT_GLOBAL_DAY=5000    # Requests per IP per day
+RATE_LIMIT_GLOBAL_HOUR=500    # Requests per IP per hour
+
+# API-specific rate limits
+RATE_LIMIT_API_MINUTE=100     # API requests per IP per minute
+RATE_LIMIT_API_HOUR=1000      # API requests per IP per hour
+
+# Web interface rate limits
+RATE_LIMIT_WEB_MINUTE=50      # Web requests per IP per minute
+RATE_LIMIT_WEB_HOUR=500       # Web requests per IP per hour
+```
+
+### Docker Compose Example
+
+```yaml
+services:
+  dnssec-validator:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=production
+      # Custom rate limits for high-traffic deployment
+      - RATE_LIMIT_GLOBAL_DAY=500
+      - RATE_LIMIT_GLOBAL_HOUR=100
+      - RATE_LIMIT_API_MINUTE=15
+      - RATE_LIMIT_API_HOUR=150
+      - RATE_LIMIT_WEB_MINUTE=30
+      - RATE_LIMIT_WEB_HOUR=300
+```
+
+### Rate Limit Responses
+
+When rate limits are exceeded:
+
+**API Endpoints** return structured JSON:
+```json
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "API rate limit exceeded",
+    "details": {
+      "limit": "10 per 1 minute",
+      "retry_after": 45,
+      "reset_time": "2024-01-15T14:30:00Z"
+    }
+  }
+}
+```
+
+**Web Interface** shows a user-friendly error page with:
+- Current rate limit information
+- Time until limit resets
+- Suggestions for API usage for automated tools
+
+### Production Recommendations
+
+For production deployments:
+
+```bash
+# Conservative limits for public services
+RATE_LIMIT_GLOBAL_DAY=1000
+RATE_LIMIT_GLOBAL_HOUR=100
+RATE_LIMIT_API_MINUTE=5
+RATE_LIMIT_API_HOUR=50
+RATE_LIMIT_WEB_MINUTE=10
+RATE_LIMIT_WEB_HOUR=100
+
+# More generous limits for internal/enterprise use
+RATE_LIMIT_GLOBAL_DAY=5000
+RATE_LIMIT_GLOBAL_HOUR=500
+RATE_LIMIT_API_MINUTE=30
+RATE_LIMIT_API_HOUR=1000
+RATE_LIMIT_WEB_MINUTE=50
+RATE_LIMIT_WEB_HOUR=1000
+```
+
 ## ⚠️ Security Considerations
 
 - This tool performs live DNS queries to validate DNSSEC
 - No domain data is stored or logged
 - All validation is performed server-side
-- Rate limiting is implemented to prevent abuse
+- Comprehensive rate limiting prevents abuse and ensures fair usage
+- Security headers (CSP, HSTS) protect against common web vulnerabilities
+- CORS configuration restricts cross-origin requests in production
 
 ## 📄 License
 
