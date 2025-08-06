@@ -12,6 +12,20 @@ from datetime import datetime, timezone
 
 from dnssec_validator import DNSSECValidator
 from models import RequestLog
+import db_init
+
+# Initialize database based on environment variables before creating Flask app
+# Check if any database management environment variables are set
+db_recreate = os.getenv('INFLUX_DB_RECREATE', 'false').lower() == 'true'
+db_truncate = os.getenv('INFLUX_DB_TRUNCATE', 'false').lower() == 'true'
+
+# Run database initialization regardless of how the app is started (direct Python or Gunicorn)
+if db_recreate or db_truncate:
+    print("🗄️  Database management operations requested...")
+    import sys
+    if not db_init.initialize_database():
+        print("❌ Failed to initialize database. Exiting.")
+        sys.exit(1)
 
 app = Flask(__name__)
 

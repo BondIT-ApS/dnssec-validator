@@ -47,6 +47,11 @@ services:
       - INFLUX_TOKEN=my-super-secret-auth-token
       - INFLUX_ORG=dnssec-validator
       - INFLUX_BUCKET=requests
+      # Database management (use these for database operations)
+      # - INFLUX_DB_RECREATE=true           # Set to 'true' to recreate database/bucket on startup
+      # - INFLUX_DB_VERSION=v2.1            # Optional schema version for tracking
+      # - INFLUX_DB_TRUNCATE=true           # Set to 'true' to truncate all data (DANGEROUS!)
+      # - INFLUX_DB_INIT_WAIT=10            # Seconds to wait for InfluxDB readiness (default: 5)
     volumes:
       - ./app:/app
     depends_on:

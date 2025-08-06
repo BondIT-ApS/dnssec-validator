@@ -296,6 +296,126 @@ class InfluxDBLogger:
         print(f"InfluxDB retention is handled automatically. Configured for {days or '90'} days.")
         return 0
     
+    def truncate_database(self) -> bool:
+        """Truncate all data from the bucket (dangerous operation)"""
+        try:
+            if not self.client:
+                print("InfluxDB client not available")
+                return False
+            
+            # Delete all data from bucket using delete API
+            from datetime import datetime, timezone
+            import urllib.parse
+            
+            # Get the delete API
+            delete_api = self.client.delete_api()
+            
+            # Delete all data from the bucket (from beginning of time to now)
+            start_time = datetime(1970, 1, 1, tzinfo=timezone.utc)
+            stop_time = datetime.now(timezone.utc)
+            
+            delete_api.delete(
+                start=start_time,
+                stop=stop_time,
+                bucket=self.bucket,
+                org=self.org
+            )
+            
+            print(f"Successfully truncated all data from bucket '{self.bucket}'")
+            return True
+            
+        except Exception as e:
+            print(f"Error truncating database: {e}")
+            return False
+    
+    def recreate_database(self, version: str = None) -> bool:
+        """Recreate the database/bucket with optional version tagging"""
+        try:
+            if not self.client:
+                print("InfluxDB client not available")
+                return False
+            
+            # Get the buckets API
+            buckets_api = self.client.buckets_api()
+            
+            try:
+                # Try to get existing bucket
+                existing_bucket = buckets_api.find_bucket_by_name(self.bucket)
+                if existing_bucket:
+                    print(f"Found existing bucket '{self.bucket}', deleting...")
+                    buckets_api.delete_bucket(existing_bucket)
+                    print(f"Deleted bucket '{self.bucket}'")
+            except Exception as e:
+                print(f"Bucket '{self.bucket}' not found or already deleted: {e}")
+            
+            # Create new bucket
+            from influxdb_client import BucketRetentionRules
+            
+            # Set up retention rules (default 90 days)
+            retention_rules = BucketRetentionRules(
+                type="expire",
+                every_seconds=90 * 24 * 60 * 60  # 90 days in seconds
+            )
+            
+            # Create bucket description with version if provided
+            description = f"DNSSEC Validator request logs"
+            if version:
+                description += f" (Schema version: {version})"
+            
+            new_bucket = buckets_api.create_bucket(
+                bucket_name=self.bucket,
+                retention_rules=retention_rules,
+                org=self.org,
+                description=description
+            )
+            
+            print(f"Successfully recreated bucket '{self.bucket}' with ID: {new_bucket.id}")
+            if version:
+                print(f"Schema version: {version}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error recreating database: {e}")
+            return False
+    
+    def get_database_info(self) -> Dict[str, Any]:
+        """Get information about the current database/bucket"""
+        try:
+            if not self.client:
+                return {'error': 'InfluxDB client not available'}
+            
+            buckets_api = self.client.buckets_api()
+            bucket = buckets_api.find_bucket_by_name(self.bucket)
+            
+            if not bucket:
+                return {'error': f'Bucket {self.bucket} not found'}
+            
+            # Get bucket statistics
+            info = {
+                'bucket_name': bucket.name,
+                'bucket_id': bucket.id,
+                'description': bucket.description,
+                'created_at': bucket.created_at.isoformat() if bucket.created_at else None,
+                'updated_at': bucket.updated_at.isoformat() if bucket.updated_at else None,
+                'retention_rules': [],
+                'org': self.org
+            }
+            
+            # Add retention rules info
+            if bucket.retention_rules:
+                for rule in bucket.retention_rules:
+                    info['retention_rules'].append({
+                        'type': rule.type,
+                        'every_seconds': rule.every_seconds,
+                        'days': rule.every_seconds // (24 * 60 * 60) if rule.every_seconds else None
+                    })
+            
+            return info
+            
+        except Exception as e:
+            return {'error': f'Error getting database info: {e}'}
+    
     def close(self):
         """Close InfluxDB client connection"""
         if self._client:
