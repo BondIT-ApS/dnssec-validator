@@ -30,9 +30,9 @@ services:
       - FLASK_ENV=development
       # Rate limiting configuration
       - RATE_LIMIT_GLOBAL_DAY=5000   # Global requests per IP per day
-      - RATE_LIMIT_GLOBAL_HOUR=500   # Global requests per IP per hour
-      - RATE_LIMIT_API_MINUTE=100    # API requests per IP per minute
-      - RATE_LIMIT_API_HOUR=1000     # API requests per IP per hour
+      - RATE_LIMIT_GLOBAL_HOUR=1000  # Global requests per IP per hour
+      - RATE_LIMIT_API_MINUTE=200    # API requests per IP per minute
+      - RATE_LIMIT_API_HOUR=2000     # API requests per IP per hour
       - RATE_LIMIT_WEB_MINUTE=50     # Web interface requests per IP per minute
       - RATE_LIMIT_WEB_HOUR=500      # Web interface requests per IP per hour
       # CORS configuration for production

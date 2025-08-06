@@ -1,4 +1,32 @@
 services:
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: dnssec-influxdb-prod
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=secure-admin-password-prod
+      - DOCKER_INFLUXDB_INIT_ORG=dnssec-validator
+      - DOCKER_INFLUXDB_INIT_BUCKET=requests
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=production-super-secret-auth-token
+    volumes:
+      - influx_data_prod:/var/lib/influxdb2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.docker.compose.project=dnssec-validator"
+      - "maintainer=BondIT ApS"
+    networks:
+      - dnssec-network
+
   dnssec-validator:
     image: maboni82/dnssec-validator:latest
     container_name: dnssec-validator-prod
@@ -8,22 +36,24 @@ services:
       - FLASK_ENV=production
       - CORS_ORIGINS=https://dnssec-validator.bondit.dk
       # Rate limiting configuration for production
-      - RATE_LIMIT_GLOBAL_DAY=1000   # Global requests per IP per day
-      - RATE_LIMIT_GLOBAL_HOUR=100   # Global requests per IP per hour
-      - RATE_LIMIT_API_MINUTE=5      # API requests per IP per minute
-      - RATE_LIMIT_API_HOUR=50       # API requests per IP per hour
-      - RATE_LIMIT_WEB_MINUTE=10     # Web interface requests per IP per minute
-      - RATE_LIMIT_WEB_HOUR=100      # Web interface requests per IP per hour
+      - RATE_LIMIT_GLOBAL_DAY=5000   # Global requests per IP per day
+      - RATE_LIMIT_GLOBAL_HOUR=1000  # Global requests per IP per hour
+      - RATE_LIMIT_API_MINUTE=200    # API requests per IP per minute
+      - RATE_LIMIT_API_HOUR=2000     # API requests per IP per hour
+      - RATE_LIMIT_WEB_MINUTE=50     # Web interface requests per IP per minute
+      - RATE_LIMIT_WEB_HOUR=500      # Web interface requests per IP per hour
       # Health check configuration
       - HEALTH_CHECK_ENABLED=true
       - HEALTH_CHECK_DNS_TEST=true
       - HEALTH_CHECK_MEMORY_THRESHOLD=90
-      # Database logging configuration
+      # InfluxDB logging configuration
       - REQUEST_LOGGING_ENABLED=true
-      - LOG_RETENTION_DAYS=30
-      - DATABASE_URL=sqlite:///data/dnssec_validator.db
-    volumes:
-      - ./data:/app/data
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=production-super-secret-auth-token
+      - INFLUX_ORG=dnssec-validator
+      - INFLUX_BUCKET=requests
+    depends_on:
+      - influxdb
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/simple"]
@@ -37,6 +67,9 @@ services:
       - "version=1.0.0"
     networks:
       - dnssec-network
+
+volumes:
+  influx_data_prod:
 
 networks:
   dnssec-network:

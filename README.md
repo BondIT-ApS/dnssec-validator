@@ -179,23 +179,119 @@ graph TB
 - **Chain Continuity**: Ensures unbroken chain from root to domain
 - **Algorithm Support**: Validates RSA/SHA-1, RSA/SHA-256, ECDSA P-256, ECDSA P-384, Ed25519
 
+## 📊 Database Logging & Analytics
+
+The DNSSEC Validator now includes comprehensive request logging and analytics using **InfluxDB**, a time-series database optimized for monitoring and analytics.
+
+### InfluxDB Integration
+
+All DNSSEC validation requests are automatically logged to InfluxDB with detailed metadata:
+
+- **Domain validation requests** with timestamps
+- **IP address tracking** for usage analytics  
+- **DNSSEC validation status** (valid/invalid/error)
+- **Request source tracking** (API vs web interface)
+- **HTTP status codes** and user agent information
+- **90-day data retention** with automatic cleanup
+
+### Configuration
+
+Database logging is configured via environment variables:
+
+```bash
+# Enable/disable request logging
+REQUEST_LOGGING_ENABLED=true
+
+# InfluxDB connection settings
+INFLUX_URL=http://influxdb:8086
+INFLUX_TOKEN=my-super-secret-auth-token
+INFLUX_ORG=dnssec-validator
+INFLUX_BUCKET=requests
+```
+
+### Analytics Capabilities
+
+The logging system provides built-in analytics methods for monitoring:
+
+- **Request count tracking** by time period (hours/days)
+- **Top domains analysis** with request frequencies
+- **Validation success/failure ratios** for quality monitoring
+- **API vs web interface usage breakdown**
+- **Hourly request patterns** for trend analysis
+- **IP-based usage analytics** for rate limiting insights
+
+### Docker Compose Integration
+
+The database logging works seamlessly with Docker Compose:
+
+```yaml
+services:
+  influxdb:
+    image: influxdb:2.7-alpine
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_ORG=dnssec-validator
+      - DOCKER_INFLUXDB_INIT_BUCKET=requests
+      - DOCKER_INFLUXDB_INIT_RETENTION=90d
+    volumes:
+      - influx_data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dnssec-validator:
+    environment:
+      - REQUEST_LOGGING_ENABLED=true
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=my-super-secret-auth-token
+    depends_on:
+      - influxdb
+```
+
+### Data Structure
+
+The InfluxDB measurement structure:
+
+- **Organization**: `dnssec-validator`
+- **Bucket**: `requests` (90-day retention)
+- **Measurement**: `request`
+- **Tags**: `domain`, `ip_address`, `dnssec_status`, `source`
+- **Fields**: `count`, `http_status`, `user_agent`
+- **Timestamp**: Automatic with nanosecond precision
+
+### Analytics Foundation
+
+This logging system creates the foundation for:
+- **Real-time monitoring dashboards** (future enhancement)
+- **Usage trend analysis** and capacity planning  
+- **Domain validation success rate monitoring**
+- **Performance optimization** based on request patterns
+- **Rate limiting refinement** using actual usage data
+
 ## 📂 Project Structure
 
 ```
 dnssec-validator/
-├── app.py                 # Flask web application
-├── dnssec_validator.py    # Core DNSSEC validation logic
+├── app/
+│   ├── app.py            # Flask web application
+│   ├── models.py         # InfluxDB logging and analytics
+│   └── cli.py            # Command-line management tools
+├── dnssec_validator.py   # Core DNSSEC validation logic
 ├── static/
 │   ├── css/
-│   │   └── style.css     # Web interface styling
+│   │   └── style.css    # Web interface styling
 │   └── js/
-│       └── app.js        # Frontend JavaScript
+│       └── app.js       # Frontend JavaScript
 ├── templates/
-│   └── index.html        # Main web interface
-├── requirements.txt       # Python dependencies
-├── Dockerfile            # Docker container definition
-├── docker-compose.yml    # Docker Compose setup
-└── README.md            # This file
+│   └── index.html       # Main web interface
+├── requirements.txt      # Python dependencies
+├── Dockerfile           # Docker container definition
+├── docker-compose.yml   # Docker Compose setup with InfluxDB
+└── README.md           # This file
 ```
 
 ## 🧪 Development
@@ -257,7 +353,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - [ ] [Add support for CAA record validation](https://github.com/BondIT-ApS/dnssec-validator/issues/35)
 - [ ] [Implement TLSA record checking](https://github.com/BondIT-ApS/dnssec-validator/issues/34)
 - [ ] [Create batch validation API](https://github.com/BondIT-ApS/dnssec-validator/issues/32)
-- [ ] [Add database for request logging and monitoring](https://github.com/BondIT-ApS/dnssec-validator/issues/33)
+- [x] [Add database for request logging and monitoring](https://github.com/BondIT-ApS/dnssec-validator/issues/33) ✅ **Completed** - InfluxDB integration with comprehensive analytics
 - [ ] [Implement caching for faster responses](https://github.com/BondIT-ApS/dnssec-validator/issues/36)
 - [ ] [Add support for internationalized domain names (IDN)](https://github.com/BondIT-ApS/dnssec-validator/issues/37)
 
@@ -269,8 +365,8 @@ The DNSSEC Validator includes comprehensive rate limiting to ensure fair usage a
 
 | Endpoint Type | Limit | Description |
 |---------------|-------|-------------|
-| **Global** | 5000/day, 500/hour | Overall requests per IP across all endpoints |
-| **API** | 100/minute, 1000/hour | REST API endpoints (`/api/validate/*`) |
+| **Global** | 5000/day, 1000/hour | Overall requests per IP across all endpoints |
+| **API** | 200/minute, 2000/hour | REST API endpoints (`/api/validate/*`) |
 | **Web Interface** | 50/minute, 500/hour | Web UI and direct domain URLs |
 
 ### Configuration
@@ -280,11 +376,11 @@ Rate limits can be customized using environment variables:
 ```bash
 # Global rate limits (applied to all requests)
 RATE_LIMIT_GLOBAL_DAY=5000    # Requests per IP per day
-RATE_LIMIT_GLOBAL_HOUR=500    # Requests per IP per hour
+RATE_LIMIT_GLOBAL_HOUR=1000   # Requests per IP per hour
 
 # API-specific rate limits
-RATE_LIMIT_API_MINUTE=100     # API requests per IP per minute
-RATE_LIMIT_API_HOUR=1000      # API requests per IP per hour
+RATE_LIMIT_API_MINUTE=200     # API requests per IP per minute
+RATE_LIMIT_API_HOUR=2000      # API requests per IP per hour
 
 # Web interface rate limits
 RATE_LIMIT_WEB_MINUTE=50      # Web requests per IP per minute
