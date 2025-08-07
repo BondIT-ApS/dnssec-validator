@@ -25,9 +25,13 @@ services:
   dnssec-validator:
     build: .
     ports:
-      - "8080:8080"
+      - "8090:8080"
     environment:
       - FLASK_ENV=development
+      # Logging configuration
+      - LOG_LEVEL=DEBUG                       # Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+      - LOG_FORMAT=standard                   # Format: 'standard' or 'json' for structured logging
+      # - LOG_FILE=/app/logs/dnssec-validator.log  # Optional: Enable file logging (uncomment to use)
       # Rate limiting configuration
       - RATE_LIMIT_GLOBAL_DAY=5000   # Global requests per IP per day
       - RATE_LIMIT_GLOBAL_HOUR=1000  # Global requests per IP per hour
