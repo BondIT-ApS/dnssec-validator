@@ -3,7 +3,7 @@ services:
     image: influxdb:2.7-alpine
     container_name: dnssec-influxdb-prod
     ports:
-      - "8086:8086"
+      - "8088:8086"  # External:Internal - Using 8088 to avoid port conflicts
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
@@ -31,9 +31,13 @@ services:
     image: maboni82/dnssec-validator:latest
     container_name: dnssec-validator-prod
     ports:
-      - "8080:8080"
+      - "8091:8080"  # Using 8091 for production setup
     environment:
       - FLASK_ENV=production
+      # Logging configuration
+      - LOG_LEVEL=INFO                        # Production log level (INFO recommended)
+      - LOG_FORMAT=json                       # JSON structured logging for production
+      # - LOG_FILE=/app/logs/dnssec-validator.log  # Optional: Enable file logging
       - CORS_ORIGINS=https://dnssec-validator.bondit.dk
       # Rate limiting configuration for production
       - RATE_LIMIT_GLOBAL_DAY=5000   # Global requests per IP per day
@@ -48,10 +52,22 @@ services:
       - HEALTH_CHECK_MEMORY_THRESHOLD=90
       # InfluxDB logging configuration
       - REQUEST_LOGGING_ENABLED=true
+      # FIXED: Use internal Docker port (8086), not external (8088)
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_TOKEN=production-super-secret-auth-token
       - INFLUX_ORG=dnssec-validator
       - INFLUX_BUCKET=requests
+      # Database initialization - choose ONE option:
+      # Option 1: Fresh start (recommended for first deployment)
+      - INFLUX_DB_RECREATE=true      # Creates fresh bucket, removes old data
+      - INFLUX_DB_TRUNCATE=false     # Not needed when recreating
+      # Option 2: Keep existing data but reset (alternative)
+      # - INFLUX_DB_RECREATE=false
+      # - INFLUX_DB_TRUNCATE=true    # Only use this if you want to keep bucket but clear data
+      # Option 3: Keep everything as-is (for normal operation)
+      # - INFLUX_DB_RECREATE=false
+      # - INFLUX_DB_TRUNCATE=false
+      - INFLUX_DB_INIT_WAIT=10       # Wait 10 seconds for InfluxDB to be ready
     depends_on:
       - influxdb
     restart: unless-stopped
