@@ -3,7 +3,7 @@ services:
     image: influxdb:2.7-alpine
     container_name: dnssec-influxdb-prod
     ports:
-      - "8086:8086"
+      - "8088:8086"
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
@@ -31,9 +31,13 @@ services:
     image: maboni82/dnssec-validator:latest
     container_name: dnssec-validator-prod
     ports:
-      - "8080:8080"
+      - "8091:8080"  # Using 8091 for production setup
     environment:
       - FLASK_ENV=production
+      # Logging configuration
+      - LOG_LEVEL=INFO                        # Production log level (INFO recommended)
+      - LOG_FORMAT=json                       # JSON structured logging for production
+      # - LOG_FILE=/app/logs/dnssec-validator.log  # Optional: Enable file logging
       - CORS_ORIGINS=https://dnssec-validator.bondit.dk
       # Rate limiting configuration for production
       - RATE_LIMIT_GLOBAL_DAY=5000   # Global requests per IP per day
@@ -45,13 +49,17 @@ services:
       # Health check configuration
       - HEALTH_CHECK_ENABLED=true
       - HEALTH_CHECK_DNS_TEST=true
-      - HEALTH_CHECK_MEMORY_THRESHOLD=90
+      - HEALTH_CHECK_MEMORY_THRESHOLD=80
       # InfluxDB logging configuration
-      - REQUEST_LOGGING_ENABLED=true
+      - REQUEST_LOGGING_ENABLED=true  # Enables stat page
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_TOKEN=production-super-secret-auth-token
       - INFLUX_ORG=dnssec-validator
       - INFLUX_BUCKET=requests
+      # Database initialization
+      - INFLUX_DB_RECREATE=false     # Creates fresh bucket, removes old data, false for normal operation
+      - INFLUX_DB_TRUNCATE=false     # Not needed when recreating, but data can be deleted on initialization
+      - INFLUX_DB_INIT_WAIT=10       # Wait 10 seconds for InfluxDB to be ready
     depends_on:
       - influxdb
     restart: unless-stopped

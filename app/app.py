@@ -64,9 +64,88 @@ limiter = Limiter(
     default_limits=[f"{rate_limits['global_day']} per day", f"{rate_limits['global_hour']} per hour"]
 )
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging with environment variable support
+def setup_logging():
+    """Configure logging based on environment variables"""
+    # Get log level from environment variable (default to INFO)
+    log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+    
+    # Map string log levels to logging constants
+    level_map = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'WARN': logging.WARNING,  # Alternative spelling
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL
+    }
+    
+    # Validate and get numeric level
+    numeric_level = level_map.get(log_level, logging.INFO)
+    if log_level not in level_map:
+        print(f"Warning: Invalid LOG_LEVEL '{log_level}', defaulting to INFO")
+        numeric_level = logging.INFO
+    
+    # Check if structured logging (JSON) is enabled
+    structured_logging = os.getenv('LOG_FORMAT', 'standard').lower() == 'json'
+    
+    # Configure log format
+    if structured_logging:
+        # JSON structured logging format
+        formatter = logging.Formatter(
+            '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "module": "%(name)s", "message": "%(message)s", "lineno": %(lineno)d}'
+        )
+    else:
+        # Standard logging format
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=numeric_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s' if not structured_logging else None
+    )
+    
+    # Configure file logging if enabled
+    log_file = os.getenv('LOG_FILE')
+    if log_file:
+        try:
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(numeric_level)
+            file_handler.setFormatter(formatter)
+            
+            # Add file handler to root logger
+            root_logger = logging.getLogger()
+            root_logger.addHandler(file_handler)
+            
+            print(f"Logging to file enabled: {log_file}")
+        except Exception as e:
+            print(f"Warning: Could not set up file logging to {log_file}: {e}")
+    
+    # If structured logging is enabled, reconfigure console handler
+    if structured_logging:
+        root_logger = logging.getLogger()
+        # Remove default handler and add custom one
+        for handler in root_logger.handlers[:]:
+            if isinstance(handler, logging.StreamHandler) and handler.stream.name == '<stderr>':
+                root_logger.removeHandler(handler)
+        
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(numeric_level)
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+    
+    return numeric_level, structured_logging
+
+# Set up logging
+log_level, is_structured = setup_logging()
 logger = logging.getLogger(__name__)
+
+# Log startup information with current configuration
+logger.info(f"DNSSEC Validator starting with log level: {logging.getLevelName(log_level)}")
+logger.debug(f"Structured logging enabled: {is_structured}")
+logger.debug(f"Log file: {os.getenv('LOG_FILE', 'None - console only')}")
 
 # Request logging functionality
 def get_client_ip():
@@ -290,11 +369,14 @@ class DNSSECValidation(Resource):
                     'errors': ['Invalid domain format']
                 }, 400
             
+            logger.debug(f"Starting DNSSEC validation for domain: {domain}")
             validator = DNSSECValidator(domain)
             result = validator.validate()
+            logger.info(f"DNSSEC validation completed for {domain} with status: {result.get('status', 'unknown')}")
             return result, 200
             
         except Exception as e:
+            logger.error(f"DNSSEC validation failed for domain {domain}: {str(e)}", exc_info=True)
             return {
                 'domain': domain,
                 'status': 'error',
@@ -334,6 +416,7 @@ class AnalyticsOverview(Resource):
             else:
                 return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
             
+            logger.debug(f"Analytics overview requested for period: {period} (hours={hours}, days={days})")
             # Get analytics data (external requests only for stats dashboard)
             total_requests = RequestLog.get_external_requests_count(hours=hours, days=days)
             api_requests = RequestLog.get_external_requests_count(hours=hours, days=days, source='api')
@@ -575,18 +658,21 @@ def health_simple():
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def index():
     """Serve the main web interface"""
+    logger.debug("Main web interface accessed")
     return render_template('index.html')
 
 @app.route('/stats')
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def stats_dashboard():
     """Serve the analytics dashboard"""
+    logger.info("Analytics dashboard accessed")
     return render_template('stats.html')
 
 @app.route('/<string:domain>')
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def check_domain_direct(domain):
     """Direct access like /bondit.dk - render page with pre-filled domain"""
+    logger.info(f"Direct domain access: {domain}")
     return render_template('index.html', domain=domain)
 
 if __name__ == '__main__':
