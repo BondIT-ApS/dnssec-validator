@@ -516,8 +516,11 @@ class AnalyticsSources(Resource):
 def ratelimit_handler(e):
     """Handle rate limit exceeded errors with user-friendly responses"""
     
-    # Calculate retry after time
+    # Calculate retry after time - handle None case
     retry_after = getattr(e, 'retry_after', 60)
+    if retry_after is None:
+        retry_after = 60  # Default fallback
+    
     reset_time = datetime.now(timezone.utc)
     if retry_after:
         reset_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
