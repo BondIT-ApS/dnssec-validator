@@ -10,7 +10,7 @@ services:
       - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
       - DOCKER_INFLUXDB_INIT_ORG=dnssec-validator
       - DOCKER_INFLUXDB_INIT_BUCKET=requests
-      - DOCKER_INFLUXDB_INIT_RETENTION=90d
+      - DOCKER_INFLUXDB_INIT_RETENTION=10d
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
     volumes:
       - influx_data:/var/lib/influxdb2
@@ -25,7 +25,7 @@ services:
   dnssec-validator:
     build: .
     ports:
-      - "8090:8080"
+      - "8080:8080"
     environment:
       - FLASK_ENV=development
       # Logging configuration
@@ -52,11 +52,10 @@ services:
       - INFLUX_ORG=dnssec-validator
       - INFLUX_BUCKET=requests
       # Database management (use these for database operations)
-      # - INFLUX_DB_RECREATE=true           # Set to 'true' to recreate database/bucket on startup
-      # - INFLUX_DB_VERSION=v2.1            # Optional schema version for tracking
-      # - INFLUX_DB_TRUNCATE=true           # Set to 'true' to truncate all data (DANGEROUS!)
-      # - INFLUX_DB_CREATE_DASHBOARD=true   # Set to 'true' to create analytics dashboard
-      # - INFLUX_DB_INIT_WAIT=10            # Seconds to wait for InfluxDB readiness (default: 5)
+      - INFLUX_DB_RECREATE=true           # Set to 'true' to recreate database/bucket on startup
+      - INFLUX_DB_VERSION=v2.1            # Optional schema version for tracking
+      - INFLUX_DB_TRUNCATE=true           # Set to 'true' to truncate all data (DANGEROUS!)
+      - INFLUX_DB_INIT_WAIT=10            # Seconds to wait for InfluxDB readiness (default: 5)
     volumes:
       - ./app:/app
     depends_on:
