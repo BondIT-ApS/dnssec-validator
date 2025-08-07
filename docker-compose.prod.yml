@@ -49,20 +49,16 @@ services:
       # Health check configuration
       - HEALTH_CHECK_ENABLED=true
       - HEALTH_CHECK_DNS_TEST=true
-      - HEALTH_CHECK_MEMORY_THRESHOLD=90
+      - HEALTH_CHECK_MEMORY_THRESHOLD=80
       # InfluxDB logging configuration
       - REQUEST_LOGGING_ENABLED=true  # Enables stat page
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_TOKEN=production-super-secret-auth-token
       - INFLUX_ORG=dnssec-validator
       - INFLUX_BUCKET=requests
-      # Database initialization - choose ONE option:
-      # Option 1: Fresh start (recommended for first deployment)
-      - INFLUX_DB_RECREATE=true      # Creates fresh bucket, removes old data
-      - INFLUX_DB_TRUNCATE=false     # Not needed when recreating
-      # Option 2: Keep everything as-is (for normal operation)
-      # - INFLUX_DB_RECREATE=false
-      # - INFLUX_DB_TRUNCATE=false
+      # Database initialization
+      - INFLUX_DB_RECREATE=false     # Creates fresh bucket, removes old data, false for normal operation
+      - INFLUX_DB_TRUNCATE=false     # Not needed when recreating, but data can be deleted on initialization
       - INFLUX_DB_INIT_WAIT=10       # Wait 10 seconds for InfluxDB to be ready
     depends_on:
       - influxdb
