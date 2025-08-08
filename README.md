@@ -1,6 +1,7 @@
 # DNSSEC Validator
 
-[![Docker Image Version](https://img.shields.io/docker/v/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
+[![Docker Image Version (Official)](https://img.shields.io/docker/v/maboni82/dnssec-validator?style=for-the-badge&logo=docker&label=release)](https://hub.docker.com/r/maboni82/dnssec-validator)
+[![Docker Image Version (Dev)](https://img.shields.io/docker/v/maboni82/dnssec-validator?style=for-the-badge&logo=docker&label=dev&filter=dev*)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BondIT-ApS/dnssec-validator/docker-publish.yml?branch=master&style=for-the-badge&logo=github)](https://github.com/BondIT-ApS/dnssec-validator/actions)
 [![GitHub Issues](https://img.shields.io/github/issues/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/issues)
@@ -43,7 +44,7 @@ docker run -p 8080:8080 maboni82/dnssec-validator:latest
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.13+ (recommended for latest security features)
 - pip
 
 ### Installation
@@ -78,6 +79,7 @@ curl "http://localhost:8080/api/validate/bondit.dk"
 {
   "domain": "bondit.dk",
   "status": "valid",
+  "validation_time": "2025-08-08T16:30:00Z",
   "chain_of_trust": [
     {
       "zone": ".",
@@ -99,10 +101,37 @@ curl "http://localhost:8080/api/validate/bondit.dk"
     }
   ],
   "records": {
-    "dnskey": [...],
-    "ds": [...],
-    "rrsig": [...]
-  }
+    "dnskey": [{
+      "zone": "bondit.dk.",
+      "flags": 256,
+      "protocol": 3,
+      "algorithm": 13,
+      "key_tag": 48993
+    }],
+    "ds": [{
+      "zone": "dk.",
+      "key_tag": 48993,
+      "algorithm": 13,
+      "digest_type": 2
+    }],
+    "rrsig": [{
+      "type_covered": "DNSKEY",
+      "algorithm": 13,
+      "labels": 2,
+      "original_ttl": 3600,
+      "expiration": 1723104000,
+      "inception": 1722499200,
+      "key_tag": 48993,
+      "signer": "bondit.dk."
+    }]
+  },
+  "tlsa_summary": {
+    "status": "valid",
+    "records_found": 2,
+    "dane_status": "valid",
+    "message": "TLSA records are correctly configured"
+  },
+  "errors": []
 }
 ```
 
@@ -222,19 +251,24 @@ The logging system provides built-in analytics methods for monitoring:
 
 ### Docker Compose Integration
 
-The database logging works seamlessly with Docker Compose:
+The database logging works seamlessly with Docker Compose. We provide two configurations:
 
+**Development (docker-compose.yml):**
 ```yaml
 services:
   influxdb:
     image: influxdb:2.7-alpine
+    container_name: dnssec-influxdb
     ports:
       - "8086:8086"
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
       - DOCKER_INFLUXDB_INIT_ORG=dnssec-validator
       - DOCKER_INFLUXDB_INIT_BUCKET=requests
-      - DOCKER_INFLUXDB_INIT_RETENTION=90d
+      - DOCKER_INFLUXDB_INIT_RETENTION=10d  # Short retention for dev
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
     volumes:
       - influx_data:/var/lib/influxdb2
     healthcheck:
@@ -244,12 +278,58 @@ services:
       retries: 3
 
   dnssec-validator:
+    build: .
+    ports:
+      - "8080:8080"
     environment:
+      - FLASK_ENV=development
       - REQUEST_LOGGING_ENABLED=true
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_TOKEN=my-super-secret-auth-token
+      - INFLUX_ORG=dnssec-validator
+      - INFLUX_BUCKET=requests
+      # Rate limiting and health check configuration
+      - RATE_LIMIT_GLOBAL_DAY=5000
+      - HEALTH_CHECK_ENABLED=true
+      - SHOW_VALIDATION_TLSA_DANE=false  # Feature flag for TLSA validation display
+    volumes:
+      - ./app:/app
     depends_on:
       - influxdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/simple"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+**Production (docker-compose.prod.yml):**
+```yaml
+services:
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: dnssec-influxdb-prod
+    ports:
+      - "8088:8086"  # Different port for production
+    environment:
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d  # Longer retention for production
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=production-super-secret-auth-token
+    networks:
+      - dnssec-network
+
+  dnssec-validator:
+    image: maboni82/dnssec-validator:latest  # Uses published image
+    container_name: dnssec-validator-prod
+    ports:
+      - "8091:8080"
+    environment:
+      - FLASK_ENV=production
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json  # Structured logging for production
+      - CORS_ORIGINS=https://dnssec-validator.bondit.dk
+      - HEALTH_CHECK_MEMORY_THRESHOLD=80
+    networks:
+      - dnssec-network
 ```
 
 ### Data Structure
@@ -276,21 +356,34 @@ This logging system creates the foundation for:
 
 ```
 dnssec-validator/
+├── .github/
+│   └── workflows/       # GitHub Actions for automated builds
+│       ├── docker-publish.yml  # Official releases (triggered by version tags)
+│       ├── nightly.yml         # Daily development builds
+│       ├── monthly.yml         # Monthly official releases
+│       └── test-build.yml      # Manual testing workflow
 ├── app/
-│   ├── app.py            # Flask web application
+│   ├── app.py            # Main Flask web application with API
 │   ├── models.py         # InfluxDB logging and analytics
-│   └── cli.py            # Command-line management tools
-├── dnssec_validator.py   # Core DNSSEC validation logic
-├── static/
-│   ├── css/
-│   │   └── style.css    # Web interface styling
-│   └── js/
-│       └── app.js       # Frontend JavaScript
-├── templates/
-│   └── index.html       # Main web interface
+│   ├── cli.py            # Command-line management tools
+│   ├── db_init.py        # Database initialization utilities
+│   ├── dnssec_validator.py  # Core DNSSEC validation logic
+│   ├── tlsa_validator.py    # TLSA/DANE validation implementation
+│   ├── static/
+│   │   ├── css/
+│   │   │   └── style.css    # Web interface styling
+│   │   └── js/
+│   │       └── app.js       # Frontend JavaScript
+│   └── templates/
+│       ├── index.html       # Main web interface
+│       ├── detailed.html    # Detailed validation results
+│       ├── stats.html       # Analytics dashboard
+│       └── rate_limit.html  # Rate limiting error page
 ├── requirements.txt      # Python dependencies
 ├── Dockerfile           # Docker container definition
-├── docker-compose.yml   # Docker Compose setup with InfluxDB
+├── docker-compose.yml   # Development Docker Compose setup
+├── docker-compose.prod.yml  # Production Docker Compose setup
+├── CONTRIBUTING.md      # Contributing guidelines
 └── README.md           # This file
 ```
 
@@ -327,13 +420,6 @@ docker run -p 8080:8080 dnssec-validator
 docker-compose up -d
 ```
 
-### Cloud Deployment
-
-The application can be deployed to:
-- **Heroku**: `heroku create your-app-name`
-- **Google Cloud Run**: `gcloud run deploy`
-- **AWS ECS**: Using the provided Dockerfile
-- **Kubernetes**: Using the provided manifests
 
 ## 🤝 Contributing
 
@@ -351,7 +437,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 ## 📋 Todo / Roadmap
 
 - [ ] [Add support for CAA record validation](https://github.com/BondIT-ApS/dnssec-validator/issues/35)
-- [ ] [Implement TLSA record checking](https://github.com/BondIT-ApS/dnssec-validator/issues/34)
+- [x] [Implement TLSA record checking](https://github.com/BondIT-ApS/dnssec-validator/issues/34) ✅ **Completed** - Full TLSA/DANE validation with certificate verification
 - [ ] [Create batch validation API](https://github.com/BondIT-ApS/dnssec-validator/issues/32)
 - [x] [Add database for request logging and monitoring](https://github.com/BondIT-ApS/dnssec-validator/issues/33) ✅ **Completed** - InfluxDB integration with comprehensive analytics
 - [ ] [Implement caching for faster responses](https://github.com/BondIT-ApS/dnssec-validator/issues/36)
@@ -542,11 +628,15 @@ livenessProbe:
 ## ⚠️ Security Considerations
 
 - This tool performs live DNS queries to validate DNSSEC
-- No domain data is stored or logged
-- All validation is performed server-side
+- **Domain request data is logged** for analytics purposes with configurable retention periods (10-30 days)
+- **Personal data**: Only IP addresses and domains are stored, no personal information
+- **Data retention**: Configurable via `INFLUX_DB_RETENTION` environment variable
+- **Data protection**: All stored data is automatically purged after retention period expires
+- All validation is performed server-side for security
 - Comprehensive rate limiting prevents abuse and ensures fair usage
 - Security headers (CSP, HSTS) protect against common web vulnerabilities
 - CORS configuration restricts cross-origin requests in production
+- API requests are logged for monitoring and analytics (can be disabled via `REQUEST_LOGGING_ENABLED=false`)
 
 ## 📄 License
 

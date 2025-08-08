@@ -34,16 +34,15 @@ jobs:
         run: |
           DATE_LOCAL=$(date +'%Y.%m.%d')
           MONTH_LOCAL=$(date +'%Y.%m')
-          SHORT_SHA="${GITHUB_SHA::7}"
           
           if [[ "${{ inputs.test_type }}" == "nightly" ]]; then
             TAG1="test-dev-${DATE_LOCAL}"
-            TAG2="test-${SHORT_SHA}"
+            TAG2="test-latest"
             echo "🧪 Testing NIGHTLY build:"
           else
-            TAG1="test-v-${MONTH_LOCAL}"
-            TAG2="test-latest"
-            echo "🧪 Testing MONTHLY build:"
+            TAG1="test-v${MONTH_LOCAL}"
+            TAG2="test-monthly-release"
+            echo "🧪 Testing MONTHLY build (official release simulation):"
           fi
           
           echo "   Tags: $TAG1, $TAG2"
