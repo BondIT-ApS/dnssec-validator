@@ -19,7 +19,7 @@ jobs:
   monthly:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write  # Need write permission to create Git tags
     env:
       IMAGE: maboni82/dnssec-validator
       TZ: Europe/Copenhagen
@@ -65,8 +65,6 @@ jobs:
         run: |
           MONTH_LOCAL=$(date +'%Y.%m')
           echo "MONTH_LOCAL=${MONTH_LOCAL}" >> "$GITHUB_OUTPUT"
-          SHORT_SHA="${GITHUB_SHA::7}"
-          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
         if: steps.when.outputs.RUN == 'true'
@@ -83,14 +81,45 @@ jobs:
         if: steps.when.outputs.RUN == 'true'
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push monthly image
+      - name: Create Git tag for official release
         if: steps.when.outputs.RUN == 'true'
         run: |
-          TAG_MONTH="v-${{ steps.vars.outputs.MONTH_LOCAL }}"
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            -t "$IMAGE:$TAG_MONTH" \
-            -t "$IMAGE:latest" \
-            --push \
-            .
+          TAG_NAME="v${{ steps.vars.outputs.MONTH_LOCAL }}"
+          echo "🏷️  Creating official release tag: $TAG_NAME"
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create and push the tag
+          git tag "$TAG_NAME" -m "Official monthly release $TAG_NAME"
+          git push origin "$TAG_NAME"
+          
+          echo "✅ Official release tag $TAG_NAME created and pushed!"
+          echo "   This will trigger docker-publish.yml to build the official release."
+
+      - name: Create GitHub Release
+        if: steps.when.outputs.RUN == 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.vars.outputs.MONTH_LOCAL }}
+          release_name: Monthly Release v${{ steps.vars.outputs.MONTH_LOCAL }}
+          body: |
+            🚀 **Monthly Release v${{ steps.vars.outputs.MONTH_LOCAL }}**
+            
+            This is an automated monthly release created on the first weekday of the month.
+            
+            **Docker Images:**
+            - `maboni82/dnssec-validator:v${{ steps.vars.outputs.MONTH_LOCAL }}`
+            - Available for `linux/amd64` and `linux/arm64`
+            
+            **What's Changed:**
+            - See commit history for detailed changes since last monthly release
+            
+            ---
+            *This release was automatically created by the monthly workflow.*
+          draft: false
+          prerelease: false
 
