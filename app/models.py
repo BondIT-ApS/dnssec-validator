@@ -66,18 +66,26 @@ class InfluxDBLogger:
     
     def log_request(self, ip_address: str, domain: str, http_status: int, 
                    dnssec_status: str, source: str, user_agent: str = None, 
-                   internal: bool = False) -> bool:
-        """Log a request to InfluxDB"""
+                   internal: bool = False, client: str = None) -> bool:
+        """Log a request to InfluxDB
+        client: optional tag to distinguish 'webapp' vs 'external' for API calls
+        """
         try:
             if not self.write_api:
                 print("InfluxDB write API not available")
                 return False
+            
+            # Normalize client tag
+            client_tag = (client or 'external').lower()
+            if client_tag not in ['webapp', 'external']:
+                client_tag = 'external'
             
             # Create point for time-series data
             point = (
                 Point("request")
                 .tag("domain", domain)
                 .tag("source", source)
+                .tag("client", client_tag)
                 .tag("dnssec_status", dnssec_status)
                 .tag("ip_address", ip_address)
                 .tag("internal", str(internal).lower())  # Add internal tag
@@ -134,6 +142,7 @@ class InfluxDBLogger:
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
+                |> filter(fn: (r) => r.domain != "unknown")
             '''
             
             # Filter out internal requests for stats dashboard
@@ -144,31 +153,42 @@ class InfluxDBLogger:
             if source:
                 flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
             
-            # Sum the counts
-            flux_query += '|> sum()'
+            # Collapse all series and sum
+            flux_query += '|> group() |> sum()'
             
             results = self._execute_query(flux_query)
-            return int(results[0].get('_value', 0)) if results else 0
+            total = 0
+            for r in results:
+                try:
+                    total += int(r.get('_value', 0))
+                except Exception:
+                    pass
+            return total
             
         except Exception as e:
             print(f"Error getting requests count: {e}")
             return 0
     
-    def get_top_domains(self, limit: int = 20, days: int = None, include_internal: bool = True) -> List[tuple]:
+    def get_top_domains(self, limit: int = 20, days: int = None, hours: int = None, include_internal: bool = True, source: str = 'api') -> List[tuple]:
         """Get most frequently validated domains"""
         try:
-            time_range = f"-{days}d" if days else "-30d"
+            time_range = f"-{hours}h" if hours else (f"-{days}d" if days else "-30d")
             
             flux_query = f'''
                 from(bucket: "{self.bucket}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
+                |> filter(fn: (r) => r.domain != "unknown")
             '''
             
             # Filter out internal requests for stats dashboard
             if not include_internal:
                 flux_query += '|> filter(fn: (r) => r.internal == "false")'
+            
+            # Only API validations for top domains by default
+            if source:
+                flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
             
             flux_query += f'''
                 |> group(columns: ["domain"])
@@ -185,105 +205,109 @@ class InfluxDBLogger:
             print(f"Error getting top domains: {e}")
             return []
     
-    def get_validation_ratio(self, days: int = None, include_internal: bool = True) -> Dict[str, Any]:
-        """Get ratio of valid vs invalid vs error validations"""
+    def get_validation_ratio(self, days: int = None, hours: int = None, include_internal: bool = True, source: str = 'api') -> Dict[str, Any]:
+        """Get ratio of valid vs invalid vs error validations.
+        Percentages are computed excluding 'error' from the denominator (valid+invalid).
+        """
         try:
-            time_range = f"-{days}d" if days else "-30d"
+            time_range = f"-{hours}h" if hours else (f"-{days}d" if days else "-30d")
             
             flux_query = f'''
                 from(bucket: "{self.bucket}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
+                |> filter(fn: (r) => r.domain != "unknown")
             '''
             
             # Filter out internal requests for stats dashboard
             if not include_internal:
                 flux_query += '|> filter(fn: (r) => r.internal == "false")'
             
+            # Only API by default
+            if source:
+                flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
+            
             flux_query += '|> group(columns: ["dnssec_status"]) |> sum()'
             
             results = self._execute_query(flux_query)
             
-            if not results:
-                return {'valid': {'count': 0, 'percentage': 0}, 
-                       'invalid': {'count': 0, 'percentage': 0}, 
-                       'error': {'count': 0, 'percentage': 0}, 
-                       'total': 0}
+            totals = {r.get('dnssec_status'): int(r.get('_value', 0)) for r in results} if results else {}
+            v = totals.get('valid', 0)
+            inv = totals.get('invalid', 0)
+            err = totals.get('error', 0)
+            total_count = v + inv + err
+            denom = v + inv
             
-            # Calculate totals and percentages
-            totals = {r.get('dnssec_status'): int(r.get('_value', 0)) for r in results}
-            total_count = sum(totals.values())
-            
-            ratios = {'total': total_count}
-            for status in ['valid', 'invalid', 'error']:
-                count = totals.get(status, 0)
-                percentage = round((count / total_count) * 100, 1) if total_count > 0 else 0
-                ratios[status] = {'count': count, 'percentage': percentage}
-            
+            ratios = {
+                'total': total_count,
+                'valid': {'count': v, 'percentage': round((v / denom) * 100, 1) if denom > 0 else 0},
+                'invalid': {'count': inv, 'percentage': round((inv / denom) * 100, 1) if denom > 0 else 0},
+                'error': {'count': err, 'percentage': 0}
+            }
             return ratios
             
         except Exception as e:
             print(f"Error getting validation ratio: {e}")
             return {'total': 0}
     
-    def get_hourly_requests(self, hours: int = 24, include_internal: bool = True) -> List[tuple]:
-        """Get hourly request counts for charts"""
+    def get_hourly_requests(self, hours: int = 24, include_internal: bool = True, window_every: str = '1h', source: str = 'api') -> List[tuple]:
+        """Get request counts aggregated by a dynamic window. Returns list of (ISO timestamp, count)."""
         try:
             flux_query = f'''
                 from(bucket: "{self.bucket}")
                 |> range(start: -{hours}h)
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
+                |> filter(fn: (r) => r.domain != "unknown")
             '''
             
             # Filter out internal requests for stats dashboard
             if not include_internal:
                 flux_query += '|> filter(fn: (r) => r.internal == "false")'
             
-            flux_query += '''
-                |> drop(columns: ["domain", "source", "dnssec_status", "ip_address", "_measurement", "_field"])
+            # Only API by default
+            if source:
+                flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
+            
+            flux_query += f'''
+                |> drop(columns: ["domain", "dnssec_status", "ip_address", "_measurement", "_field"])
                 |> group()
-                |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)
+                |> aggregateWindow(every: {window_every}, fn: sum, createEmpty: false)
                 |> yield()
             '''
             
             results = self._execute_query(flux_query)
-            
-            # Process and deduplicate results by timestamp
-            time_buckets = {}
+            series = []
             for r in results:
                 if r.get('_time'):
-                    timestamp_str = r.get('_time').strftime('%Y-%m-%d %H:00:00')
+                    ts = r.get('_time').isoformat()
                     value = int(r.get('_value', 0))
-                    if timestamp_str in time_buckets:
-                        time_buckets[timestamp_str] += value
-                    else:
-                        time_buckets[timestamp_str] = value
-            
-            # Sort by timestamp and return as list of tuples
-            return sorted(time_buckets.items())
+                    series.append((ts, value))
+            # Sort by timestamp
+            return sorted(series, key=lambda x: x[0])
             
         except Exception as e:
             print(f"Error getting hourly requests: {e}")
             return []
     
-    def get_source_breakdown(self, days: int = None) -> List[tuple]:
-        """Get breakdown of API vs webapp requests"""
+    def get_source_breakdown(self, days: int = None, hours: int = None) -> List[tuple]:
+        """Get breakdown of API usage 'external' vs 'webapp' via client tag for API-only requests"""
         try:
-            time_range = f"-{days}d" if days else "-30d"
+            time_range = f"-{hours}h" if hours else (f"-{days}d" if days else "-30d")
             
             flux_query = f'''
                 from(bucket: "{self.bucket}")
                 |> range(start: {time_range})
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
-                |> group(columns: ["source"])
+                |> filter(fn: (r) => r.source == "api")
+                |> group(columns: ["client"])
                 |> sum()
             '''
             
             results = self._execute_query(flux_query)
-            return [(r.get('source'), int(r.get('_value', 0))) for r in results]
+            return [(r.get('client') or 'external', int(r.get('_value', 0))) for r in results]
             
         except Exception as e:
             print(f"Error getting source breakdown: {e}")
@@ -451,8 +475,8 @@ class RequestLog:
         return influx_logger.get_hourly_requests(hours)
     
     @classmethod
-    def get_source_breakdown(cls, days: int = None) -> List[tuple]:
-        return influx_logger.get_source_breakdown(days)
+    def get_source_breakdown(cls, days: int = None, hours: int = None) -> List[tuple]:
+        return influx_logger.get_source_breakdown(days=days, hours=hours)
     
     @classmethod
     def cleanup_old_logs(cls, days: int = None) -> int:
@@ -464,13 +488,13 @@ class RequestLog:
         return influx_logger.get_requests_count(hours, days, source, include_internal=False)
     
     @classmethod
-    def get_external_top_domains(cls, limit: int = 20, days: int = None) -> List[tuple]:
-        return influx_logger.get_top_domains(limit, days, include_internal=False)
+    def get_external_top_domains(cls, limit: int = 20, days: int = None, hours: int = None) -> List[tuple]:
+        return influx_logger.get_top_domains(limit, days=days, hours=hours, include_internal=False, source='api')
     
     @classmethod
-    def get_external_validation_ratio(cls, days: int = None) -> Dict[str, Any]:
-        return influx_logger.get_validation_ratio(days, include_internal=False)
+    def get_external_validation_ratio(cls, days: int = None, hours: int = None) -> Dict[str, Any]:
+        return influx_logger.get_validation_ratio(days=days, hours=hours, include_internal=False, source='api')
     
     @classmethod
-    def get_external_hourly_requests(cls, hours: int = 24) -> List[tuple]:
-        return influx_logger.get_hourly_requests(hours, include_internal=False)
+    def get_external_hourly_requests(cls, hours: int = 24, window_every: str = '1h') -> List[tuple]:
+        return influx_logger.get_hourly_requests(hours, include_internal=False, window_every=window_every, source='api')

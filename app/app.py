@@ -184,28 +184,38 @@ def log_request(response):
         # Determine source (api vs webapp)
         source = 'api' if request.path.startswith('/api/') else 'webapp'
         
-        # Extract domain from request
-        domain = 'unknown'
-        if request.path.startswith('/api/validate/'):
-            domain = request.path.replace('/api/validate/', '')
-        elif request.path != '/' and not request.path.startswith('/api/docs'):
-            # Direct domain access like /bondit.dk
-            domain = request.path.lstrip('/')
+        # We do NOT log plain web page views; only log API requests
+        if source != 'api':
+            return response
         
         # Determine if this is an internal request (analytics, stats, etc.)
         internal_paths = [
             '/api/analytics/',
-            '/stats',
             '/health',
             '/api/docs',
         ]
         is_internal = any(request.path.startswith(path) for path in internal_paths)
+        if is_internal:
+            # Don't log internal analytics/health/api-docs calls
+            return response
+        
+        # Extract domain from request for validate endpoint
+        domain = 'unknown'
+        if request.path.startswith('/api/validate/'):
+            candidate = request.path.replace('/api/validate/', '')
+            # Only accept if it looks like a domain (simple regex)
+            import re
+            if re.match(r'^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', candidate):
+                domain = candidate
+        
+        # Identify client: webapp vs external (explicit header only)
+        client = 'webapp' if request.headers.get('X-Client', '').lower() == 'webapp' else 'external'
         
         # Get DNSSEC status from response if available
         dnssec_status = 'unknown'
         if hasattr(g, 'dnssec_status'):
             dnssec_status = g.dnssec_status
-        elif response.status_code == 200 and source == 'api' and not is_internal:
+        elif response.status_code == 200:
             # Try to parse status from response JSON
             try:
                 if response.is_json:
@@ -217,11 +227,7 @@ def log_request(response):
         elif response.status_code >= 400:
             dnssec_status = 'error'
         
-        # For internal requests, set appropriate dnssec_status
-        if is_internal:
-            dnssec_status = 'internal'
-        
-        # Log the request with internal flag
+        # Log the API request
         from models import influx_logger
         influx_logger.log_request(
             ip_address=get_client_ip(),
@@ -230,7 +236,8 @@ def log_request(response):
             dnssec_status=dnssec_status,
             source=source,
             user_agent=request.headers.get('User-Agent', ''),
-            internal=is_internal,
+            internal=False,
+            client=client,
         )
         
     except Exception as e:
@@ -417,12 +424,23 @@ class AnalyticsOverview(Resource):
                 return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
             
             logger.debug(f"Analytics overview requested for period: {period} (hours={hours}, days={days})")
-            # Get analytics data (external requests only for stats dashboard)
-            total_requests = RequestLog.get_external_requests_count(hours=hours, days=days)
-            api_requests = RequestLog.get_external_requests_count(hours=hours, days=days, source='api')
-            web_requests = RequestLog.get_external_requests_count(hours=hours, days=days, source='webapp')
-            validation_ratio = RequestLog.get_external_validation_ratio(days=days if days else 1)
-            top_domains = RequestLog.get_external_top_domains(limit=10, days=days if days else 1)
+            # Get analytics data (API validations only; exclude internal endpoints)
+            # Get breakdown by client (external vs webapp)
+            breakdown_list = RequestLog.get_source_breakdown(days=days, hours=hours)
+            breakdown = {'external': 0, 'webapp': 0}
+            for client, count in breakdown_list:
+                if client not in breakdown:
+                    breakdown[client] = 0
+                breakdown[client] += count
+            
+            external_cnt = breakdown.get('external', 0)
+            internal_cnt = breakdown.get('webapp', 0)
+            total_requests = external_cnt + internal_cnt
+            api_requests = external_cnt  # External API callers
+            web_requests = internal_cnt  # Internal = webapp using API
+            
+            validation_ratio = RequestLog.get_external_validation_ratio(days=days, hours=hours)
+            top_domains = RequestLog.get_external_top_domains(limit=10, days=days, hours=hours)
             
             return {
                 'total_requests': total_requests,
@@ -463,8 +481,16 @@ class AnalyticsTimeSeries(Resource):
             else:
                 return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
             
-            # Get hourly data (external requests only for stats dashboard)
-            hourly_data = RequestLog.get_external_hourly_requests(hours=hours)
+            # Choose window size
+            if period == '1h':
+                window = '5m'
+            elif period == '24h':
+                window = '15m'
+            else:
+                window = '1h'
+            
+            # Get hourly data (external requests only for stats dashboard, API only)
+            hourly_data = RequestLog.get_external_hourly_requests(hours=hours, window_every=window)
             
             # Format data for chart
             chart_data = [{
@@ -487,23 +513,35 @@ class AnalyticsTimeSeries(Resource):
 @ns_analytics.route('/sources')
 class AnalyticsSources(Resource):
     @ns_analytics.doc('get_source_breakdown')
-    @ns_analytics.param('period', 'Time period in days', _in='query', type=int, default=7)
+    @ns_analytics.param('period', 'Time period: 1h, 24h, 7d, 30d', _in='query', default='7d')
     @ns_analytics.response(200, 'Success - Source breakdown data')
     @limiter.limit(f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour")
     def get(self):
         """
-        Get breakdown of API vs webapp requests
-        
-        Returns the distribution of requests between API and web interface.
+        Get breakdown of API callers: external vs webapp (API only)
         """
         try:
-            days = request.args.get('period', 7, type=int)
-            source_data = RequestLog.get_source_breakdown(days=days)
+            period = request.args.get('period', '7d')
+            if period == '1h':
+                hours, days = 1, None
+            elif period == '24h':
+                hours, days = 24, None
+            elif period == '7d':
+                hours, days = None, 7
+            elif period == '30d':
+                hours, days = None, 30
+            else:
+                return {'error': 'Invalid period. Use: 1h, 24h, 7d, 30d'}, 400
+            
+            source_data = RequestLog.get_source_breakdown(days=days, hours=hours)
             
             # Format for chart
-            breakdown = {}
-            for source, count in source_data:
-                breakdown[source] = count
+            breakdown = { 'external': 0, 'webapp': 0 }
+            for client, count in source_data:
+                key = client or 'external'
+                if key not in breakdown:
+                    breakdown[key] = 0
+                breakdown[key] += count
             
             return breakdown, 200
             
