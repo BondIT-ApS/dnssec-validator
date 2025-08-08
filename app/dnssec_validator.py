@@ -44,7 +44,10 @@ class DNSSECValidator:
             if chain_valid:
                 self.results['status'] = 'valid'
             else:
-                self.results['status'] = 'invalid'
+                # Status was already set in _validate_chain_of_trust
+                # Can be 'invalid' (broken DNSSEC) or 'insecure' (no DNSSEC)
+                if self.results['status'] == 'unknown':
+                    self.results['status'] = 'invalid'
                 
         except Exception as e:
             self.results['status'] = 'error'
@@ -55,38 +58,73 @@ class DNSSECValidator:
     def _validate_chain_of_trust(self):
         """Validate the complete chain of trust from root to domain"""
         try:
-            # For now, let's simplify and just validate the target domain directly
-            # A full chain of trust validation is quite complex and requires
-            # proper root trust anchor management
-            
-            # Just check if the domain has DNSSEC records
+            # Step 1: Check if domain has DNSKEY records
             dnskey_rrset = self._query_dnskey(self.domain_name)
-            if dnskey_rrset:
+            if not dnskey_rrset:
+                self.results['status'] = 'insecure'
                 self.results['chain_of_trust'].append({
                     'zone': str(self.domain_name),
-                    'status': 'valid',
-                    'algorithm': dnskey_rrset[0].algorithm if dnskey_rrset else None,
-                    'key_tag': dns.dnssec.key_id(dnskey_rrset[0]) if dnskey_rrset else None
+                    'status': 'insecure',
+                    'error': 'No DNSKEY records found - domain is not signed'
                 })
-                
-                # Store DNSKEY records
-                for rr in dnskey_rrset:
-                    self.results['records']['dnskey'].append({
-                        'zone': str(self.domain_name),
-                        'flags': rr.flags,
-                        'protocol': rr.protocol,
-                        'algorithm': rr.algorithm,
-                        'key_tag': dns.dnssec.key_id(rr)
-                    })
-                    
-                return True
-            else:
+                return False
+            
+            # Store DNSKEY records
+            for rr in dnskey_rrset:
+                self.results['records']['dnskey'].append({
+                    'zone': str(self.domain_name),
+                    'flags': rr.flags,
+                    'protocol': rr.protocol,
+                    'algorithm': rr.algorithm,
+                    'key_tag': dns.dnssec.key_id(rr)
+                })
+            
+            # Step 2: Critical - Check for DS records in parent zone
+            # This establishes the chain of trust from parent to child
+            ds_rrset = self._query_ds(self.domain_name, None)
+            
+            if not ds_rrset:
+                # Domain has DNSKEY but no DS record in parent - this is the bug!
+                self.results['status'] = 'invalid'
                 self.results['chain_of_trust'].append({
                     'zone': str(self.domain_name),
                     'status': 'invalid',
-                    'error': 'No DNSKEY records found'
+                    'error': 'Domain is signed but has no DS record in parent zone - chain of trust broken'
                 })
                 return False
+            
+            # Store DS records
+            for rr in ds_rrset:
+                self.results['records']['ds'].append({
+                    'zone': str(self.domain_name),
+                    'key_tag': rr.key_tag,
+                    'algorithm': rr.algorithm,
+                    'digest_type': rr.digest_type,
+                    'digest': rr.digest.hex()
+                })
+            
+            # Step 3: Verify DS record matches DNSKEY (simplified check)
+            ds_key_tags = {rr.key_tag for rr in ds_rrset}
+            dnskey_tags = {dns.dnssec.key_id(rr) for rr in dnskey_rrset}
+            
+            if not ds_key_tags.intersection(dnskey_tags):
+                self.results['status'] = 'invalid'
+                self.results['chain_of_trust'].append({
+                    'zone': str(self.domain_name),
+                    'status': 'invalid',
+                    'error': 'DS records do not match any DNSKEY records'
+                })
+                return False
+            
+            # If we get here, domain has both DNSKEY and matching DS records
+            self.results['chain_of_trust'].append({
+                'zone': str(self.domain_name),
+                'status': 'valid',
+                'algorithm': dnskey_rrset[0].algorithm if dnskey_rrset else None,
+                'key_tag': dns.dnssec.key_id(dnskey_rrset[0]) if dnskey_rrset else None
+            })
+            
+            return True
                 
         except Exception as e:
             self.results['errors'].append(f"Chain validation error: {str(e)}")

@@ -306,7 +306,7 @@ chain_of_trust_model = api.model('ChainOfTrust', {
 
 validation_result_model = api.model('ValidationResult', {
     'domain': fields.String(required=True, description='The domain that was validated'),
-    'status': fields.String(required=True, description='Validation status', enum=['valid', 'invalid', 'error']),
+    'status': fields.String(required=True, description='Validation status', enum=['valid', 'invalid', 'insecure', 'error']),
     'validation_time': fields.String(required=True, description='ISO timestamp of validation'),
     'chain_of_trust': fields.List(fields.Nested(chain_of_trust_model), description='Chain of trust validation details'),
     'records': fields.Nested(records_model, description='DNSSEC records found'),
