@@ -131,9 +131,15 @@
             text-align: center;
         }
         
+        /* Make charts responsive to container size */
         .chart-canvas {
             position: relative;
             height: 300px;
+            width: 100%;
+        }
+        .chart-canvas canvas {
+            width: 100% !important;
+            height: 100% !important;
         }
         
         .full-width-chart {
@@ -191,11 +197,13 @@
             text-align: center;
         }
         
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             .charts-grid {
                 grid-template-columns: 1fr;
             }
-            
+        }
+        
+        @media (max-width: 768px) {
             .dashboard-header {
                 flex-direction: column;
                 text-align: center;
@@ -204,6 +212,7 @@
             .time-selector {
                 justify-content: center;
             }
+            .chart-canvas { height: 260px; }
         }
     </style>
 </head>
@@ -300,6 +309,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    resizeDelay: 200,
                     plugins: {
                         legend: {
                             display: false
@@ -334,7 +344,8 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false
+                    maintainAspectRatio: false,
+                    resizeDelay: 200
                 }
             });
             
@@ -351,7 +362,8 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false
+                    maintainAspectRatio: false,
+                    resizeDelay: 200
                 }
             });
         }
