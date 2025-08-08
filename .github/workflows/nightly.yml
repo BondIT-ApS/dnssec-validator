@@ -27,8 +27,13 @@ jobs:
         id: vars
         run: |
           DATE_LOCAL=$(date +'%Y.%m.%d')
-          echo "DATE_LOCAL=${DATE_LOCAL}" >> "$GITHUB_OUTPUT"
           SHORT_SHA="${GITHUB_SHA::7}"
+          
+          echo "🌙 Building nightly image:"
+          echo "   Date: $DATE_LOCAL ($(date +'%A, %B %d, %Y'))"
+          echo "   Tags: dev-$DATE_LOCAL, $SHORT_SHA"
+          
+          echo "DATE_LOCAL=${DATE_LOCAL}" >> "$GITHUB_OUTPUT"
           echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
