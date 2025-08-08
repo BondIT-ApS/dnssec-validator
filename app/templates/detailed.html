@@ -223,12 +223,9 @@
     </div>
     
     <script>
-<<<<<<< HEAD
         // Feature flags
         window.SHOW_TLSA_DANE = {{ 'true' if show_tlsa_dane else 'false' }};
         
-=======
->>>>>>> origin/master
         let currentDomain = {{ domain|tojson if domain else "null" }};
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -429,7 +426,6 @@
                 html += '</div>';
             }
             
-<<<<<<< HEAD
             // TLSA/DANE Analysis (comprehensive) - only show if feature is enabled
             if (window.SHOW_TLSA_DANE === true && data.detailed_analysis && data.detailed_analysis.tlsa_analysis) {
                 const tlsaAnalysis = data.detailed_analysis.tlsa_analysis;
@@ -582,8 +578,6 @@
                 `;
             }
             
-=======
->>>>>>> origin/master
             // Raw DNS Queries
             if (data.detailed_analysis && data.detailed_analysis.raw_dns_queries) {
                 html += `
