@@ -8,9 +8,14 @@ import dns.query
 import dns.message
 from datetime import datetime, timezone
 import logging
+import os
 import time
 import hashlib
 import base64
+try:
+    from .tlsa_validator import TLSAValidator
+except ImportError:
+    from tlsa_validator import TLSAValidator
 
 class DNSSECValidator:
     def __init__(self, domain):
@@ -26,6 +31,7 @@ class DNSSECValidator:
                 'ds': [],
                 'rrsig': []
             },
+            'tlsa_summary': None,  # Basic TLSA info for simple validation
             'errors': []
         }
         
@@ -55,6 +61,13 @@ class DNSSECValidator:
         except Exception as e:
             self.results['status'] = 'error'
             self.results['errors'].append(str(e))
+            
+        # Add basic TLSA check (non-blocking)
+        try:
+            self._add_tlsa_summary()
+        except Exception as e:
+            logging.warning(f"TLSA check failed: {e}")
+            # Don't fail the overall validation for TLSA issues
             
         return self.results
     
@@ -282,6 +295,9 @@ class DNSSECValidator:
             
             # Generate recommendations
             self._generate_recommendations(detailed_result)
+            
+            # Add comprehensive TLSA analysis
+            self._add_detailed_tlsa_analysis(detailed_result)
             
         except Exception as e:
             detailed_result['detailed_analysis']['errors'] = [f"Detailed analysis error: {str(e)}"]
@@ -549,3 +565,78 @@ class DNSSECValidator:
         ])
         
         result['detailed_analysis']['recommendations'] = recommendations
+    
+    def _add_detailed_tlsa_analysis(self, result):
+        """Add comprehensive TLSA/DANE analysis to detailed validation results"""
+        try:
+            tlsa_validator = TLSAValidator(self.domain)
+            detailed_tlsa = tlsa_validator.get_detailed_analysis()
+            
+            # Add comprehensive TLSA analysis to detailed results
+            result['detailed_analysis']['tlsa_analysis'] = detailed_tlsa
+            
+            # Also update the basic TLSA summary with more details from comprehensive analysis
+            if detailed_tlsa and 'validation_result' in detailed_tlsa:
+                validation_result = detailed_tlsa['validation_result']
+                result['tlsa_summary'] = {
+                    'status': validation_result.get('tlsa_status', 'unknown'),
+                    'records_found': len(validation_result.get('tlsa_records', [])),
+                    'dane_status': validation_result.get('dane_validation', {}).get('status', 'unknown'),
+                    'message': self._get_tlsa_status_message(validation_result.get('tlsa_status', 'unknown'))
+                }
+            
+        except Exception as e:
+            logging.warning(f"Detailed TLSA analysis failed: {e}")
+            # Add error info to detailed analysis
+            result['detailed_analysis']['tlsa_analysis'] = {
+                'error': f"TLSA analysis failed: {str(e)}",
+                'status': 'error'
+            }
+    
+    def _get_tlsa_status_message(self, status):
+        """Get user-friendly message for TLSA status"""
+        status_messages = {
+            'valid': '✅ DANE/TLSA validation successful',
+            'invalid': '❌ DANE/TLSA validation failed',
+            'no_records': '💡 No TLSA records found - consider implementing DANE',
+            'cert_unavailable': '⚠️ Could not retrieve TLS certificate',
+            'error': '⚠️ TLSA check failed'
+        }
+        return status_messages.get(status, '❓ TLSA status unknown')
+    
+    def _add_tlsa_summary(self):
+        """Add basic TLSA summary to simple validation results"""
+        try:
+            tlsa_validator = TLSAValidator(self.domain)
+            tlsa_result = tlsa_validator.validate_tlsa(timeout=5)  # Quick check
+            
+            # Create summary for basic view
+            summary = {
+                'status': tlsa_result['tlsa_status'],
+                'records_found': len(tlsa_result['tlsa_records']),
+                'dane_status': tlsa_result['dane_validation']['status'] if 'dane_validation' in tlsa_result else 'unknown'
+            }
+            
+            # Add simple status indicators
+            if summary['status'] == 'valid':
+                summary['message'] = '✅ DANE/TLSA validation successful'
+            elif summary['status'] == 'invalid':
+                summary['message'] = '❌ DANE/TLSA validation failed'
+            elif summary['status'] == 'no_records':
+                summary['message'] = '💡 No TLSA records found - consider implementing DANE'
+            elif summary['status'] == 'cert_unavailable':
+                summary['message'] = '⚠️ Could not retrieve TLS certificate'
+            else:
+                summary['message'] = '❓ TLSA status unknown'
+            
+            self.results['tlsa_summary'] = summary
+            
+        except Exception as e:
+            logging.debug(f"TLSA summary generation failed: {e}")
+            # Set minimal summary on error
+            self.results['tlsa_summary'] = {
+                'status': 'error',
+                'records_found': 0,
+                'dane_status': 'error',
+                'message': '⚠️ TLSA check failed'
+            }

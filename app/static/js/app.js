@@ -75,6 +75,17 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // Show TLSA summary if available and feature is enabled
+        if (data.tlsa_summary && window.SHOW_TLSA_DANE === true) {
+            html += '<h3>🔒 TLSA/DANE Validation</h3>';
+            html += '<div class="chain-item">';
+            html += '<p><strong>Status:</strong> ' + data.tlsa_summary.status + '</p>';
+            html += '<p><strong>TLSA Records Found:</strong> ' + data.tlsa_summary.records_found + '</p>';
+            html += '<p><strong>DANE Status:</strong> ' + data.tlsa_summary.dane_status + '</p>';
+            html += '<p style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; font-style: italic;">' + data.tlsa_summary.message + '</p>';
+            html += '</div>';
+        }
+
         if (data.errors && data.errors.length > 0) {
             html += '<h3>Errors</h3>';
             data.errors.forEach(function(error) {

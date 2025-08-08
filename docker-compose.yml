@@ -28,6 +28,8 @@ services:
       - "8080:8080"
     environment:
       - FLASK_ENV=development
+      # Feature flags
+      - SHOW_VALIDATION_TLSA_DANE=false       # Enable TLSA/DANE validation display in webapp
       # Logging configuration
       - LOG_LEVEL=DEBUG                       # Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
       - LOG_FORMAT=standard                   # Format: 'standard' or 'json' for structured logging
