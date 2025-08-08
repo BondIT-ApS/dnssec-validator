@@ -326,7 +326,7 @@
             charts.sources = new Chart(sourcesCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['API', 'Web Interface'],
+                    labels: ['External', 'Internal'],
                     datasets: [{
                         data: [],
                         backgroundColor: ['#3498db', '#e74c3c']
@@ -431,13 +431,13 @@
                     charts.timeseries.update();
                 }
                 
-                // Fetch sources data
-                const sourcesResponse = await fetch(`/api/analytics/sources?period=7`);
+                // Fetch sources data for selected period
+                const sourcesResponse = await fetch(`/api/analytics/sources?period=${currentPeriod}`);
                 const sourcesData = await sourcesResponse.json();
                 
                 if (sourcesResponse.ok) {
                     charts.sources.data.datasets[0].data = [
-                        sourcesData.api || 0,
+                        sourcesData.external || 0,
                         sourcesData.webapp || 0
                     ];
                     charts.sources.update();
