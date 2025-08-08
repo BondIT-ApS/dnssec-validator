@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNSSEC Detailed Analysis - {{ domain or 'DNSSEC Validator' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .detailed-analysis {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .section-header {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        .subsection {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .subsection h4 {
+            color: #34495e;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .algorithm-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 10px 0;
+        }
+        .algorithm-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            min-width: 200px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .algorithm-card.excellent { border-left: 4px solid #27ae60; }
+        .algorithm-card.good { border-left: 4px solid #f39c12; }
+        .algorithm-card.weak { border-left: 4px solid #e74c3c; }
+        .algorithm-card.unknown { border-left: 4px solid #95a5a6; }
+        
+        .troubleshooting {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .troubleshooting h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        .troubleshooting ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .troubleshooting li {
+            margin: 5px 0;
+            color: #856404;
+        }
+        
+        .recommendations {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .recommendations h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+        .recommendations ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .recommendations li {
+            margin: 5px 0;
+            color: #155724;
+        }
+        
+        .dns-query {
+            margin: 15px 0;
+        }
+        .query-header {
+            background: #495057;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 3px 3px 0 0;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        .query-response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            padding: 10px;
+            border-radius: 0 0 3px 3px;
+            font-family: monospace;
+            font-size: 0.85em;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        
+        .timing-info {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-valid { background-color: #28a745; }
+        .status-invalid { background-color: #dc3545; }
+        .status-insecure { background-color: #6c757d; }
+        .status-error { background-color: #ffc107; }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .back-link {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            transition: background 0.3s;
+        }
+        .back-link:hover {
+            background: #5a6268;
+            color: white;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
+            <h1 style="margin: 0;">DNSSEC Detailed Analysis</h1>
+            <nav style="display: flex; gap: 10px;">
+                <a href="/" class="back-link">← Back to Validator</a>
+                <a href="/stats" style="padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em; transition: background 0.3s;" 
+                   onmouseover="this.style.background='#2980b9'" onmouseout="this.style.background='#3498db'">📊 Analytics</a>
+                <a href="/api/docs/" style="padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em; transition: background 0.3s;"
+                   onmouseover="this.style.background='#219a52'" onmouseout="this.style.background='#27ae60'">📖 API Docs</a>
+            </nav>
+        </header>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="margin: 0 0 10px 0; color: #2c3e50;">
+                Domain: <span id="domain-name">{{ domain or 'Enter domain below' }}</span>
+            </h2>
+            <p style="margin: 0; color: #6c757d;">
+                Comprehensive technical analysis with raw DNS data, algorithm assessment, and troubleshooting guidance
+            </p>
+        </div>
+        
+        {% if not domain %}
+        <form id="dnssec-form" style="margin-bottom: 30px;">
+            <input type="text" id="domain-input" placeholder="Enter a domain name (e.g., bondit.dk)" required style="width: 70%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1em;">
+            <button type="submit" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; cursor: pointer;">Analyze Domain</button>
+        </form>
+        {% endif %}
+        
+        <div id="results-container">
+            {% if domain %}
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Performing detailed DNSSEC analysis...</p>
+                <p style="font-size: 0.9em; color: #999;">This may take a few seconds as we gather comprehensive data</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        let currentDomain = {{ domain|tojson if domain else "null" }};
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if domain %}
+            performDetailedAnalysis({{ domain|tojson }});
+            {% endif %}
+            
+            const form = document.getElementById('dnssec-form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const domain = document.getElementById('domain-input').value.trim();
+                    if (domain) {
+                        window.location.href = '/' + domain + '/detailed';
+                    }
+                });
+            }
+        });
+        
+        function performDetailedAnalysis(domain) {
+            console.log('🔍 Starting detailed analysis for domain:', domain);
+            const container = document.getElementById('results-container');
+            
+            if (!container) {
+                console.error('❌ Results container not found!');
+                return;
+            }
+            
+            // Show loading state
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Performing detailed DNSSEC analysis for <strong>${domain}</strong>...</p>
+                    <p style="font-size: 0.9em; color: #999;">This may take a few seconds as we gather comprehensive data</p>
+                </div>
+            `;
+            
+            const apiUrl = `/api/validate/${domain}/detailed`;
+            console.log('📡 Making API call to:', apiUrl);
+            
+            fetch(apiUrl, {
+                headers: {
+                    'X-Client': 'webapp'
+                }
+            })
+            .then(response => {
+                console.log('📥 Response received:', response.status, response.statusText);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('✅ Data received:', data);
+                console.log('🔧 Calling displayDetailedResults...');
+                displayDetailedResults(data);
+            })
+            .catch(error => {
+                console.error('❌ Error in detailed analysis:', error);
+                container.innerHTML = `
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; color: #721c24;">
+                        <h3>⚠️ Analysis Failed</h3>
+                        <p>Unable to perform detailed analysis: ${error.message}</p>
+                        <p><small>Check browser console for details</small></p>
+                        <button onclick="performDetailedAnalysis('${domain}')" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Retry Analysis</button>
+                    </div>
+                `;
+            });
+        }
+        
+        function displayDetailedResults(data) {
+            console.log('🎨 displayDetailedResults called with data:', data);
+            const container = document.getElementById('results-container');
+            
+            try {
+                const statusClass = getStatusClass(data.status);
+                const statusIcon = getStatusIcon(data.status);
+            
+            let html = `
+                <div class="detailed-analysis">
+                    <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                        <span class="status-indicator status-${data.status}"></span>
+                        <h2 style="margin: 0; color: #2c3e50;">${statusIcon} Status: ${data.status.toUpperCase()}</h2>
+                    </div>
+            `;
+            
+            // Basic validation summary
+            html += `
+                <div class="section-header">🔍 Validation Summary</div>
+                <div class="subsection">
+                    <p><strong>Domain:</strong> ${data.domain}</p>
+                    <p><strong>Status:</strong> ${data.status}</p>
+                    <p><strong>Analysis Time:</strong> ${new Date(data.validation_time).toLocaleString()}</p>
+                </div>
+            `;
+            
+            // Chain of Trust
+            if (data.chain_of_trust && data.chain_of_trust.length > 0) {
+                html += `
+                    <div class="section-header">🔗 Chain of Trust</div>
+                    <div class="subsection">
+                `;
+                data.chain_of_trust.forEach(chain => {
+                    const chainStatus = getStatusClass(chain.status);
+                    html += `
+                        <div style="margin: 10px 0; padding: 10px; border-left: 4px solid ${getStatusColor(chain.status)}; background: #f8f9fa;">
+                            <strong>${chain.zone}</strong>: ${chain.status}
+                            ${chain.algorithm ? `<br><small>Algorithm: ${chain.algorithm}, Key Tag: ${chain.key_tag}</small>` : ''}
+                            ${chain.error ? `<br><small style="color: #dc3545;">Error: ${chain.error}</small>` : ''}
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            // Algorithm Analysis
+            if (data.detailed_analysis && data.detailed_analysis.algorithm_analysis) {
+                html += `
+                    <div class="section-header">🔐 Algorithm Analysis</div>
+                    <div class="algorithm-info">
+                `;
+                Object.entries(data.detailed_analysis.algorithm_analysis).forEach(([algId, info]) => {
+                    html += `
+                        <div class="algorithm-card ${info.strength}">
+                            <h5 style="margin: 0 0 10px 0; color: #2c3e50;">Algorithm ${algId}</h5>
+                            <p style="margin: 5px 0; font-weight: 600;">${info.name}</p>
+                            <p style="margin: 5px 0; font-size: 0.9em;">Strength: ${info.strength}</p>
+                            <p style="margin: 5px 0; font-size: 0.9em;">${info.recommended ? '✅' : '❌'} ${info.recommended ? 'Recommended' : 'Not Recommended'}</p>
+                            <p style="margin: 5px 0 0 0; font-size: 0.85em; color: #666;">${info.note}</p>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            // DNS Records
+            if (data.records) {
+                html += `
+                    <div class="section-header">📋 DNSSEC Records</div>
+                    <div class="subsection">
+                `;
+                
+                // DNSKEY Records
+                if (data.records.dnskey && data.records.dnskey.length > 0) {
+                    html += `
+                        <h4>🔑 DNSKEY Records (${data.records.dnskey.length} found)</h4>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                                <tr style="background: #e9ecef;">
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Key Tag</th>
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Algorithm</th>
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Flags</th>
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Type</th>
+                                </tr>
+                    `;
+                    data.records.dnskey.forEach(key => {
+                        const keyType = (key.flags & 1) ? 'KSK' : 'ZSK';
+                        html += `
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">${key.key_tag}</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">${key.algorithm}</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">${key.flags}</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">${keyType}</td>
+                            </tr>
+                        `;
+                    });
+                    html += '</table></div>';
+                }
+                
+                // DS Records
+                if (data.records.ds && data.records.ds.length > 0) {
+                    html += `
+                        <h4>🔗 DS Records (${data.records.ds.length} found)</h4>
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                                <tr style="background: #e9ecef;">
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Key Tag</th>
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Algorithm</th>
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Digest Type</th>
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Digest (first 16 chars)</th>
+                                </tr>
+                    `;
+                    data.records.ds.forEach(ds => {
+                        html += `
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">${ds.key_tag}</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">${ds.algorithm}</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">${ds.digest_type}</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.85em;">${ds.digest ? ds.digest.substring(0, 16) + '...' : 'N/A'}</td>
+                            </tr>
+                        `;
+                    });
+                    html += '</table></div>';
+                } else {
+                    html += `<h4>🔗 DS Records</h4><p style="color: #dc3545;">❌ No DS records found in parent zone</p>`;
+                }
+                
+                html += '</div>';
+            }
+            
+            // Raw DNS Queries
+            if (data.detailed_analysis && data.detailed_analysis.raw_dns_queries) {
+                html += `
+                    <div class="section-header">🌐 Raw DNS Queries</div>
+                    <div class="subsection">
+                `;
+                data.detailed_analysis.raw_dns_queries.forEach(query => {
+                    html += `
+                        <div class="dns-query">
+                            <div class="query-header">
+                                ${query.type} query for ${query.zone} 
+                                <span style="float: right;">${query.response_time_ms}ms</span>
+                            </div>
+                            <div class="query-response">${query.response || query.error || 'No response'}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            // Query Timing
+            if (data.detailed_analysis && data.detailed_analysis.query_timing) {
+                html += `
+                    <div class="section-header">⏱️ Query Performance</div>
+                    <div class="timing-info">
+                `;
+                Object.entries(data.detailed_analysis.query_timing).forEach(([query, time]) => {
+                    html += `<p><strong>${query}:</strong> ${time}ms</p>`;
+                });
+                html += '</div>';
+            }
+            
+            // Troubleshooting
+            if (data.detailed_analysis && data.detailed_analysis.troubleshooting && data.detailed_analysis.troubleshooting.length > 0) {
+                html += `
+                    <div class="troubleshooting">
+                        <h4>🛠️ Troubleshooting Guide</h4>
+                        <ul>
+                `;
+                data.detailed_analysis.troubleshooting.forEach(item => {
+                    html += `<li>${item}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            // Recommendations
+            if (data.detailed_analysis && data.detailed_analysis.recommendations && data.detailed_analysis.recommendations.length > 0) {
+                html += `
+                    <div class="recommendations">
+                        <h4>💡 Recommendations</h4>
+                        <ul>
+                `;
+                data.detailed_analysis.recommendations.forEach(item => {
+                    html += `<li>${item}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            // Errors
+            if (data.errors && data.errors.length > 0) {
+                html += `
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; margin: 15px 0;">
+                        <h4 style="color: #721c24; margin-bottom: 10px;">⚠️ Errors Encountered</h4>
+                        <ul style="margin: 0; color: #721c24;">
+                `;
+                data.errors.forEach(error => {
+                    html += `<li>${error}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            html += '</div>';
+            
+            // Add action buttons
+            html += `
+                <div style="margin: 30px 0; text-align: center;">
+                    <button onclick="performDetailedAnalysis('${data.domain}')" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 0 5px;">🔄 Refresh Analysis</button>
+                    <a href="/${data.domain}" style="padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin: 0 5px;">← Basic Analysis</a>
+                    <a href="/api/validate/${data.domain}/detailed" target="_blank" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; margin: 0 5px;">📄 Raw JSON</a>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+            console.log('✅ displayDetailedResults completed successfully');
+            
+            } catch (error) {
+                console.error('❌ Error in displayDetailedResults:', error);
+                container.innerHTML = `
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; color: #721c24;">
+                        <h3>❌ Display Error</h3>
+                        <p>Error displaying results: ${error.message}</p>
+                        <p><small>Check browser console for details</small></p>
+                        <pre style="font-size: 0.8em; background: #f1f1f1; padding: 10px; border-radius: 3px; margin: 10px 0;">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            }
+        }
+        
+        function getStatusClass(status) {
+            const classes = {
+                'valid': 'success',
+                'invalid': 'danger',
+                'insecure': 'secondary',
+                'error': 'warning'
+            };
+            return classes[status] || 'secondary';
+        }
+        
+        function getStatusIcon(status) {
+            const icons = {
+                'valid': '✅',
+                'invalid': '❌',
+                'insecure': '🔓',
+                'error': '⚠️'
+            };
+            return icons[status] || '❓';
+        }
+        
+        function getStatusColor(status) {
+            const colors = {
+                'valid': '#28a745',
+                'invalid': '#dc3545',
+                'insecure': '#6c757d',
+                'error': '#ffc107'
+            };
+            return colors[status] || '#6c757d';
+        }
+    </script>
+</body>
+</html>

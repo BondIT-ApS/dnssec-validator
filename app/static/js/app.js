@@ -81,6 +81,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 html += '<div class="error-item">' + error + '</div>';
             });
         }
+        
+        // Add detailed analysis link
+        html += '<div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; text-align: center;"><p style="margin: 0 0 10px 0; color: #6c757d;">Want more technical details?</p><a href="/' + encodeURIComponent(data.domain) + '/detailed" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500;">🔍 View Detailed Analysis</a></div>';
 
         resultsContainer.innerHTML = html;
     }
