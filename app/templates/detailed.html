@@ -223,11 +223,11 @@
     </div>
     
     <script>
-        let currentDomain = {{ ("'" + domain + "'") if domain else "null" }};
+        let currentDomain = {{ domain|tojson if domain else "null" }};
         
         document.addEventListener('DOMContentLoaded', function() {
             {% if domain %}
-            performDetailedAnalysis('{{ domain }}');
+            performDetailedAnalysis({{ domain|tojson }});
             {% endif %}
             
             const form = document.getElementById('dnssec-form');
@@ -243,7 +243,13 @@
         });
         
         function performDetailedAnalysis(domain) {
+            console.log('🔍 Starting detailed analysis for domain:', domain);
             const container = document.getElementById('results-container');
+            
+            if (!container) {
+                console.error('❌ Results container not found!');
+                return;
+            }
             
             // Show loading state
             container.innerHTML = `
@@ -254,20 +260,33 @@
                 </div>
             `;
             
-            fetch(`/api/validate/${domain}/detailed`, {
+            const apiUrl = `/api/validate/${domain}/detailed`;
+            console.log('📡 Making API call to:', apiUrl);
+            
+            fetch(apiUrl, {
                 headers: {
                     'X-Client': 'webapp'
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('📥 Response received:', response.status, response.statusText);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('✅ Data received:', data);
+                console.log('🔧 Calling displayDetailedResults...');
                 displayDetailedResults(data);
             })
             .catch(error => {
+                console.error('❌ Error in detailed analysis:', error);
                 container.innerHTML = `
                     <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; color: #721c24;">
                         <h3>⚠️ Analysis Failed</h3>
                         <p>Unable to perform detailed analysis: ${error.message}</p>
+                        <p><small>Check browser console for details</small></p>
                         <button onclick="performDetailedAnalysis('${domain}')" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Retry Analysis</button>
                     </div>
                 `;
@@ -275,9 +294,12 @@
         }
         
         function displayDetailedResults(data) {
+            console.log('🎨 displayDetailedResults called with data:', data);
             const container = document.getElementById('results-container');
-            const statusClass = getStatusClass(data.status);
-            const statusIcon = getStatusIcon(data.status);
+            
+            try {
+                const statusClass = getStatusClass(data.status);
+                const statusIcon = getStatusIcon(data.status);
             
             let html = `
                 <div class="detailed-analysis">
@@ -484,6 +506,19 @@
             `;
             
             container.innerHTML = html;
+            console.log('✅ displayDetailedResults completed successfully');
+            
+            } catch (error) {
+                console.error('❌ Error in displayDetailedResults:', error);
+                container.innerHTML = `
+                    <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; color: #721c24;">
+                        <h3>❌ Display Error</h3>
+                        <p>Error displaying results: ${error.message}</p>
+                        <p><small>Check browser console for details</small></p>
+                        <pre style="font-size: 0.8em; background: #f1f1f1; padding: 10px; border-radius: 3px; margin: 10px 0;">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            }
         }
         
         function getStatusClass(status) {
