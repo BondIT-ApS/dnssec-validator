@@ -390,6 +390,55 @@ class DNSSECValidation(Resource):
                 'errors': [sanitize_error(e)]
             }, 500
 
+@ns_validate.route('/<string:domain>/detailed')
+@ns_validate.param('domain', 'The domain name to analyze in detail (e.g., bondit.dk)')
+class DNSSECDetailedValidation(Resource):
+    @ns_validate.doc('validate_domain_detailed')
+    @ns_validate.expect()
+    @ns_validate.response(200, 'Success - Detailed domain analysis completed')
+    @ns_validate.response(400, 'Bad Request - Invalid domain format')
+    @ns_validate.response(429, 'Too Many Requests - Rate limit exceeded')
+    @ns_validate.response(500, 'Internal Server Error - Analysis failed')
+    @limiter.limit(f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour")
+    def get(self, domain):
+        """
+        Perform detailed DNSSEC analysis for a domain
+        
+        This endpoint performs comprehensive DNSSEC analysis including:
+        - All features from basic validation
+        - Raw DNS query responses (dig-style output)
+        - Algorithm strength analysis
+        - Signature validity periods
+        - Key strength assessment
+        - Troubleshooting recommendations
+        - Security best practice suggestions
+        - Query timing information
+        
+        Returns extensive technical details for debugging and analysis.
+        """
+        try:
+            # Basic domain validation
+            if not domain or len(domain) > 253:
+                return {
+                    'domain': domain,
+                    'status': 'error',
+                    'errors': ['Invalid domain format']
+                }, 400
+            
+            logger.debug(f"Starting detailed DNSSEC analysis for domain: {domain}")
+            validator = DNSSECValidator(domain)
+            result = validator.validate_detailed()
+            logger.info(f"Detailed DNSSEC analysis completed for {domain} with status: {result.get('status', 'unknown')}")
+            return result, 200
+            
+        except Exception as e:
+            logger.error(f"Detailed DNSSEC analysis failed for domain {domain}: {str(e)}", exc_info=True)
+            return {
+                'domain': domain,
+                'status': 'error',
+                'errors': [sanitize_error(e)]
+            }, 500
+
 # Analytics endpoints
 @ns_analytics.route('/overview')
 class AnalyticsOverview(Resource):
@@ -712,6 +761,13 @@ def check_domain_direct(domain):
     """Direct access like /bondit.dk - render page with pre-filled domain"""
     logger.info(f"Direct domain access: {domain}")
     return render_template('index.html', domain=domain)
+
+@app.route('/<string:domain>/detailed')
+@limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
+def check_domain_detailed(domain):
+    """Detailed DNSSEC analysis page like /bondit.dk/detailed"""
+    logger.info(f"Detailed domain analysis access: {domain}")
+    return render_template('detailed.html', domain=domain)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
