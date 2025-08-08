@@ -8,7 +8,7 @@
     <style>
         .detailed-analysis {
             background: #f8f9fa;
-            border-left: 4px solid #007bff;
+            border-left: 4px solid #3498db;
             padding: 15px;
             margin: 20px 0;
         }
@@ -207,7 +207,7 @@
         {% if not domain %}
         <form id="dnssec-form" style="margin-bottom: 30px;">
             <input type="text" id="domain-input" placeholder="Enter a domain name (e.g., bondit.dk)" required style="width: 70%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1em;">
-            <button type="submit" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; cursor: pointer;">Analyze Domain</button>
+            <button type="submit" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 1em; cursor: pointer;">Analyze Domain</button>
         </form>
         {% endif %}
         
@@ -342,16 +342,15 @@
             if (data.detailed_analysis && data.detailed_analysis.algorithm_analysis) {
                 html += `
                     <div class="section-header">🔐 Algorithm Analysis</div>
-                    <div class="algorithm-info">
+                    <div class="subsection">
                 `;
                 Object.entries(data.detailed_analysis.algorithm_analysis).forEach(([algId, info]) => {
+                    const strengthColor = info.strength === 'excellent' ? '#27ae60' : info.strength === 'good' ? '#f39c12' : info.strength === 'weak' ? '#e74c3c' : '#6c757d';
                     html += `
-                        <div class="algorithm-card ${info.strength}">
-                            <h5 style="margin: 0 0 10px 0; color: #2c3e50;">Algorithm ${algId}</h5>
-                            <p style="margin: 5px 0; font-weight: 600;">${info.name}</p>
-                            <p style="margin: 5px 0; font-size: 0.9em;">Strength: ${info.strength}</p>
-                            <p style="margin: 5px 0; font-size: 0.9em;">${info.recommended ? '✅' : '❌'} ${info.recommended ? 'Recommended' : 'Not Recommended'}</p>
-                            <p style="margin: 5px 0 0 0; font-size: 0.85em; color: #666;">${info.note}</p>
+                        <div style="margin: 10px 0; padding: 10px; border-left: 4px solid ${strengthColor}; background: #f8f9fa;">
+                            <strong>Algorithm ${algId}: ${info.name}</strong><br>
+                            <small>Strength: ${info.strength} | ${info.recommended ? '✅ Recommended' : '❌ Not Recommended'}</small><br>
+                            <small style="color: #666;">${info.note}</small>
                         </div>
                     `;
                 });
@@ -402,7 +401,7 @@
                                     <th style="padding: 8px; border: 1px solid #dee2e6;">Key Tag</th>
                                     <th style="padding: 8px; border: 1px solid #dee2e6;">Algorithm</th>
                                     <th style="padding: 8px; border: 1px solid #dee2e6;">Digest Type</th>
-                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Digest (first 16 chars)</th>
+                                    <th style="padding: 8px; border: 1px solid #dee2e6;">Digest (first 32 chars)</th>
                                 </tr>
                     `;
                     data.records.ds.forEach(ds => {
@@ -411,7 +410,7 @@
                                 <td style="padding: 8px; border: 1px solid #dee2e6;">${ds.key_tag}</td>
                                 <td style="padding: 8px; border: 1px solid #dee2e6;">${ds.algorithm}</td>
                                 <td style="padding: 8px; border: 1px solid #dee2e6;">${ds.digest_type}</td>
-                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.85em;">${ds.digest ? ds.digest.substring(0, 16) + '...' : 'N/A'}</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.85em;">${ds.digest ? ds.digest.substring(0, 32) + '...' : 'N/A'}</td>
                             </tr>
                         `;
                     });
@@ -499,7 +498,7 @@
             // Add action buttons
             html += `
                 <div style="margin: 30px 0; text-align: center;">
-                    <button onclick="performDetailedAnalysis('${data.domain}')" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 0 5px;">🔄 Refresh Analysis</button>
+                    <button onclick="performDetailedAnalysis('${data.domain}')" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 0 5px;">🔄 Refresh Analysis</button>
                     <a href="/${data.domain}" style="padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin: 0 5px;">← Basic Analysis</a>
                     <a href="/api/validate/${data.domain}/detailed" target="_blank" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; margin: 0 5px;">📄 Raw JSON</a>
                 </div>
