@@ -201,8 +201,16 @@ def log_request(response):
         
         # Extract domain from request for validate endpoint
         domain = 'unknown'
+        request_type = 'unknown'
         if request.path.startswith('/api/validate/'):
             candidate = request.path.replace('/api/validate/', '')
+            # Handle /detailed suffix for detailed analysis endpoints
+            if candidate.endswith('/detailed'):
+                candidate = candidate[:-9]  # Remove '/detailed' suffix
+                request_type = 'detailed'
+            else:
+                request_type = 'basic'
+            
             # Only accept if it looks like a domain (simple regex)
             import re
             if re.match(r'^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', candidate):
@@ -238,6 +246,7 @@ def log_request(response):
             user_agent=request.headers.get('User-Agent', ''),
             internal=False,
             client=client,
+            request_type=request_type,
         )
         
     except Exception as e:

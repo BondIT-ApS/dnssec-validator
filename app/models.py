@@ -66,9 +66,10 @@ class InfluxDBLogger:
     
     def log_request(self, ip_address: str, domain: str, http_status: int, 
                    dnssec_status: str, source: str, user_agent: str = None, 
-                   internal: bool = False, client: str = None) -> bool:
+                   internal: bool = False, client: str = None, request_type: str = None) -> bool:
         """Log a request to InfluxDB
         client: optional tag to distinguish 'webapp' vs 'external' for API calls
+        request_type: optional tag to distinguish 'basic' vs 'detailed' analysis
         """
         try:
             if not self.write_api:
@@ -92,6 +93,10 @@ class InfluxDBLogger:
                 .field("http_status", http_status)
                 .field("count", 1)
             )
+            
+            # Add request_type tag if provided (basic vs detailed analysis)
+            if request_type:
+                point = point.tag("request_type", request_type)
             
             # Add user agent as field if provided (can be large)
             if user_agent:
