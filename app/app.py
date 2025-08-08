@@ -790,5 +790,12 @@ def check_domain_detailed(domain):
     show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
     return render_template('detailed.html', domain=domain, show_tlsa_dane=show_tlsa_dane)
 
+@app.route('/<string:domain>/detailed')
+@limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
+def check_domain_detailed(domain):
+    """Detailed DNSSEC analysis page like /bondit.dk/detailed"""
+    logger.info(f"Detailed domain analysis access: {domain}")
+    return render_template('detailed.html', domain=domain)
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
