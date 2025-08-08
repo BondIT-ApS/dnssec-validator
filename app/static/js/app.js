@@ -27,7 +27,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateDomain(domain) {
         resultsContainer.innerHTML = '<p>Validating DNSSEC for ' + escapeHTML(domain) + '...</p>';
         
-        fetch('/api/validate/' + encodeURIComponent(domain))
+        fetch('/api/validate/' + encodeURIComponent(domain), {
+                headers: {
+                    'X-Client': 'webapp'
+                }
+            })
             .then(response => response.json())
             .then(data => displayResults(data))
             .catch(error => {
