@@ -24,6 +24,9 @@
         <div id="results-container"></div>
     </div>
     <script>
+        // Feature flags
+        window.SHOW_TLSA_DANE = {{ 'true' if show_tlsa_dane else 'false' }};
+        
         // Auto-validate if domain is pre-filled
         {% if domain %}
         window.addEventListener('DOMContentLoaded', function() {

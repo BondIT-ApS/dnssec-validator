@@ -313,12 +313,20 @@ chain_of_trust_model = api.model('ChainOfTrust', {
     'error': fields.String(description='Error message if validation failed')
 })
 
+tlsa_summary_model = api.model('TLSASummary', {
+    'status': fields.String(required=True, description='TLSA validation status', enum=['valid', 'invalid', 'no_records', 'cert_unavailable', 'error']),
+    'records_found': fields.Integer(required=True, description='Number of TLSA records found'),
+    'dane_status': fields.String(required=True, description='DANE validation status'),
+    'message': fields.String(required=True, description='User-friendly status message')
+})
+
 validation_result_model = api.model('ValidationResult', {
     'domain': fields.String(required=True, description='The domain that was validated'),
     'status': fields.String(required=True, description='Validation status', enum=['valid', 'invalid', 'insecure', 'error']),
     'validation_time': fields.String(required=True, description='ISO timestamp of validation'),
     'chain_of_trust': fields.List(fields.Nested(chain_of_trust_model), description='Chain of trust validation details'),
     'records': fields.Nested(records_model, description='DNSSEC records found'),
+    'tlsa_summary': fields.Nested(tlsa_summary_model, description='TLSA/DANE validation summary'),
     'errors': fields.List(fields.String, description='Any errors encountered during validation')
 })
 
@@ -372,9 +380,10 @@ class DNSSECValidation(Resource):
         - DNSKEY record validation
         - DS record verification
         - RRSIG signature checking
+        - TLSA/DANE validation (RFC 6698)
         
         Returns detailed validation results including status, trust chain,
-        and all relevant DNSSEC records found.
+        TLSA validation summary, and all relevant DNSSEC records found.
         """
         try:
             # Basic domain validation
@@ -755,7 +764,8 @@ def health_simple():
 def index():
     """Serve the main web interface"""
     logger.debug("Main web interface accessed")
-    return render_template('index.html')
+    show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
+    return render_template('index.html', show_tlsa_dane=show_tlsa_dane)
 
 @app.route('/stats')
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
@@ -769,14 +779,16 @@ def stats_dashboard():
 def check_domain_direct(domain):
     """Direct access like /bondit.dk - render page with pre-filled domain"""
     logger.info(f"Direct domain access: {domain}")
-    return render_template('index.html', domain=domain)
+    show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
+    return render_template('index.html', domain=domain, show_tlsa_dane=show_tlsa_dane)
 
 @app.route('/<string:domain>/detailed')
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def check_domain_detailed(domain):
     """Detailed DNSSEC analysis page like /bondit.dk/detailed"""
     logger.info(f"Detailed domain analysis access: {domain}")
-    return render_template('detailed.html', domain=domain)
+    show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
+    return render_template('detailed.html', domain=domain, show_tlsa_dane=show_tlsa_dane)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)

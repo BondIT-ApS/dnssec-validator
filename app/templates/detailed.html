@@ -223,6 +223,9 @@
     </div>
     
     <script>
+        // Feature flags
+        window.SHOW_TLSA_DANE = {{ 'true' if show_tlsa_dane else 'false' }};
+        
         let currentDomain = {{ domain|tojson if domain else "null" }};
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -421,6 +424,158 @@
                 }
                 
                 html += '</div>';
+            }
+            
+            // TLSA/DANE Analysis (comprehensive) - only show if feature is enabled
+            if (window.SHOW_TLSA_DANE === true && data.detailed_analysis && data.detailed_analysis.tlsa_analysis) {
+                const tlsaAnalysis = data.detailed_analysis.tlsa_analysis;
+                html += `
+                    <div class="section-header">🔒 TLSA/DANE Analysis</div>
+                    <div class="subsection">
+                `;
+                
+                if (tlsaAnalysis.error) {
+                    html += `<p style="color: #dc3545;">❌ TLSA analysis failed: ${tlsaAnalysis.error}</p>`;
+                } else if (tlsaAnalysis.validation_result) {
+                    const result = tlsaAnalysis.validation_result;
+                    
+                    // TLSA Records
+                    if (result.tlsa_records && result.tlsa_records.length > 0) {
+                        html += `
+                            <h4>📋 TLSA Records (${result.tlsa_records.length} found)</h4>
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                                    <tr style="background: #e9ecef;">
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Usage</th>
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Selector</th>
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Matching</th>
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Data (first 16 chars)</th>
+                                    </tr>
+                        `;
+                        result.tlsa_records.forEach(record => {
+                            html += `
+                                <tr>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6;">${record.usage}</td>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6;">${record.selector}</td>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6;">${record.matching_type}</td>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.85em;">${record.certificate_data ? record.certificate_data.substring(0, 16) + '...' : 'N/A'}</td>
+                                </tr>
+                            `;
+                        });
+                        html += '</table></div>';
+                    } else {
+                        html += '<h4>📋 TLSA Records</h4><p style="color: #6c757d;">💡 No TLSA records found</p>';
+                    }
+                    
+                    // Certificate Information
+                    if (result.certificate_info) {
+                        const cert = result.certificate_info;
+                        html += `
+                            <h4>🔐 TLS Certificate</h4>
+                            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                                <p><strong>Subject:</strong> ${cert.subject || 'N/A'}</p>
+                                <p><strong>Issuer:</strong> ${cert.issuer || 'N/A'}</p>
+                                <p><strong>Valid From:</strong> ${cert.not_before ? new Date(cert.not_before).toLocaleString() : 'N/A'}</p>
+                                <p><strong>Valid To:</strong> ${cert.not_after ? new Date(cert.not_after).toLocaleString() : 'N/A'}</p>
+                                <p><strong>Serial Number:</strong> ${cert.serial_number || 'N/A'}</p>
+                                ${cert.fingerprints ? Object.entries(cert.fingerprints).map(([alg, fp]) => `<p><strong>${alg.toUpperCase()} Fingerprint:</strong> <code style="font-size: 0.9em;">${fp}</code></p>`).join('') : ''}
+                            </div>
+                        `;
+                    } else if (result.tlsa_records && result.tlsa_records.length > 0) {
+                        html += '<h4>🔐 TLS Certificate</h4><p style="color: #dc3545;">❌ Could not retrieve TLS certificate</p>';
+                    }
+                    
+                    // DANE Validation Results
+                    if (result.dane_validation) {
+                        const dane = result.dane_validation;
+                        html += `
+                            <h4>🛡️ DANE Validation Results</h4>
+                            <div style="background: ${dane.status === 'valid' ? '#d4edda' : '#f8d7da'}; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                                <p><strong>Status:</strong> ${dane.status}</p>
+                                <p><strong>Valid Records:</strong> ${dane.valid_records || 0}</p>
+                                <p><strong>Invalid Records:</strong> ${dane.invalid_records || 0}</p>
+                        `;
+                        
+                        if (dane.validation_details && dane.validation_details.length > 0) {
+                            html += '<h5>Validation Details:</h5><ul>';
+                            dane.validation_details.forEach(detail => {
+                                const statusIcon = detail.valid ? '✅' : '❌';
+                                html += `<li>${statusIcon} ${detail.message}</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                        
+                        if (dane.errors && dane.errors.length > 0) {
+                            html += '<h5>Errors:</h5><ul>';
+                            dane.errors.forEach(error => {
+                                html += `<li style="color: #721c24;">❌ ${error}</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                        
+                        html += '</div>';
+                    }
+                }
+                
+                // TLSA Recommendations from detailed analysis
+                if (tlsaAnalysis.recommendations && tlsaAnalysis.recommendations.length > 0) {
+                    html += `
+                        <div style="background: #d1ecf1; border: 1px solid #b8daff; border-radius: 5px; padding: 15px; margin: 15px 0;">
+                            <h4 style="color: #0c5460; margin-bottom: 10px;">💡 TLSA/DANE Recommendations</h4>
+                            <ul style="margin: 0; color: #0c5460;">
+                    `;
+                    tlsaAnalysis.recommendations.forEach(rec => {
+                        html += `<li>${rec}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+                
+                // Add educational content about TLSA/DANE ONLY if the feature flag is enabled
+                if (window.SHOW_TLSA_DANE === true) {
+                    html += `
+                        <div style="background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 5px; padding: 15px; margin: 15px 0;">
+                            <h4 style="color: #004085; margin-bottom: 10px;">📚 About TLSA/DANE</h4>
+                            <p style="margin: 10px 0; color: #004085; line-height: 1.5;">
+                                <strong>DANE (DNS-based Authentication of Named Entities)</strong> uses TLSA records to bind TLS certificates 
+                                to domain names via DNS. This provides an additional layer of security by allowing domain owners to 
+                                specify which certificates are authorized for their domain.
+                            </p>
+                            <div style="margin: 15px 0;">
+                                <h5 style="color: #004085; margin-bottom: 8px;">🔗 Learn More:</h5>
+                                <ul style="margin: 0; color: #004085; line-height: 1.6;">
+                                    <li><a href="https://tools.ietf.org/html/rfc6698" target="_blank" style="color: #0066cc;">RFC 6698: DANE Specification</a></li>
+                                    <li><a href="https://tools.ietf.org/html/rfc7671" target="_blank" style="color: #0066cc;">RFC 7671: DANE Deployment Guide</a></li>
+                                    <li><a href="https://www.internetsociety.org/deploy360/dnssec/dane/" target="_blank" style="color: #0066cc;">Internet Society DANE Guide</a></li>
+                                    <li><a href="https://ssl-tools.net/tlsa-generator" target="_blank" style="color: #0066cc;">TLSA Record Generator Tool</a></li>
+                                    <li><a href="https://dane.sys4.de/" target="_blank" style="color: #0066cc;">DANE/TLSA Validator Tool</a></li>
+                                </ul>
+                            </div>
+                            <div style="margin: 15px 0;">
+                                <h5 style="color: #004085; margin-bottom: 8px;">🛠️ Implementation Steps:</h5>
+                                <ol style="margin: 0; color: #004085; line-height: 1.6;">
+                                    <li>Ensure your domain has DNSSEC enabled</li>
+                                    <li>Generate TLSA records for your certificates</li>
+                                    <li>Add TLSA records to your DNS zone</li>
+                                    <li>Test DANE validation</li>
+                                    <li>Monitor and maintain TLSA records</li>
+                                </ol>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+            } else if (window.SHOW_TLSA_DANE === true && data.tlsa_summary) {
+                // Basic TLSA summary if detailed analysis not available - only show if feature is enabled
+                html += `
+                    <div class="section-header">🔒 TLSA/DANE Summary</div>
+                    <div class="subsection">
+                        <p><strong>Status:</strong> ${data.tlsa_summary.status}</p>
+                        <p><strong>TLSA Records Found:</strong> ${data.tlsa_summary.records_found}</p>
+                        <p><strong>DANE Status:</strong> ${data.tlsa_summary.dane_status}</p>
+                        <p style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; font-style: italic;">${data.tlsa_summary.message}</p>
+                    </div>
+                `;
             }
             
             // Raw DNS Queries

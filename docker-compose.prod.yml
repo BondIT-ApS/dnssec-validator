@@ -34,6 +34,8 @@ services:
       - "8091:8080"  # Using 8091 for production setup
     environment:
       - FLASK_ENV=production
+      # Feature flags
+      - SHOW_VALIDATION_TLSA_DANE=false      # Enable TLSA/DANE validation display in webapp
       # Logging configuration
       - LOG_LEVEL=INFO                        # Production log level (INFO recommended)
       - LOG_FORMAT=json                       # JSON structured logging for production
