@@ -1,0 +1,75 @@
+name: monthly
+
+on:
+  schedule:
+    - cron: "5 2 * * *"  # 02:05 UTC daily
+  workflow_dispatch:
+
+jobs:
+  monthly:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      IMAGE: maboni82/dnssec-validator
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Decide if today is first weekday of month (UTC)
+        id: when
+        shell: bash
+        run: |
+          FIRST_OF_MONTH=$(date -u +'%Y-%m-01')
+          DOW=$(date -u -d "$FIRST_OF_MONTH" +%u)  # 1..7 Mon..Sun
+          case "$DOW" in
+            6) FIRST_WEEKDAY=$(date -u -d "$FIRST_OF_MONTH +2 days" +%Y-%m-%d) ;;
+            7) FIRST_WEEKDAY=$(date -u -d "$FIRST_OF_MONTH +1 day" +%Y-%m-%d) ;;
+            *) FIRST_WEEKDAY=$(date -u -d "$FIRST_OF_MONTH" +%Y-%m-%d) ;;
+          esac
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "FIRST_WEEKDAY=$FIRST_WEEKDAY" >> "$GITHUB_OUTPUT"
+          echo "TODAY=$TODAY" >> "$GITHUB_OUTPUT"
+          if [[ "$TODAY" == "$FIRST_WEEKDAY" ]]; then
+            echo "RUN=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "RUN=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set tags
+        if: steps.when.outputs.RUN == 'true'
+        id: vars
+        run: |
+          MONTH_UTC=$(date -u +'%Y.%m')
+          echo "MONTH_UTC=${MONTH_UTC}" >> "$GITHUB_OUTPUT"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub
+        if: steps.when.outputs.RUN == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up QEMU
+        if: steps.when.outputs.RUN == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        if: steps.when.outputs.RUN == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push monthly image
+        if: steps.when.outputs.RUN == 'true'
+        run: |
+          TAG_MONTH="v-${{ steps.vars.outputs.MONTH_UTC }}"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t "$IMAGE:$TAG_MONTH" \
+            -t "$IMAGE:latest" \
+            --push \
+            .
+
