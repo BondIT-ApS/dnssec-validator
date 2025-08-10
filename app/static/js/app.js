@@ -3,10 +3,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const domainInput = document.getElementById('domain-input');
     const resultsContainer = document.getElementById('results-container');
 
+    // Normalize domain input on blur (when field loses focus)
+    domainInput.addEventListener('blur', function() {
+        const normalizedDomain = domainInput.value.trim().toLowerCase();
+        domainInput.value = normalizedDomain;
+    });
+    
+    // Optional: Real-time normalization while typing (commented out by default)
+    // Uncomment the following lines if you want immediate normalization while typing
+    // domainInput.addEventListener('input', function() {
+    //     const cursorPosition = domainInput.selectionStart;
+    //     const normalizedDomain = domainInput.value.toLowerCase();
+    //     domainInput.value = normalizedDomain;
+    //     domainInput.setSelectionRange(cursorPosition, cursorPosition);
+    // });
+
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        const domain = domainInput.value.trim();
+        const domain = domainInput.value.trim().toLowerCase();
         if (domain) {
+            // Ensure input field shows the final normalized domain
+            domainInput.value = domain;
             validateDomain(domain);
         }
     });
