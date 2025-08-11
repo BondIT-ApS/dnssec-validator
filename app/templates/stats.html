@@ -176,6 +176,19 @@
             color: #2c3e50;
         }
         
+        .domain-link {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s, text-decoration 0.3s;
+        }
+        
+        .domain-link:hover {
+            color: #2980b9;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        
         .domain-count {
             color: #3498db;
             font-weight: bold;
@@ -428,7 +441,7 @@
                     if (overviewData.top_domains && overviewData.top_domains.length > 0) {
                         domainsList.innerHTML = overviewData.top_domains.map(([domain, count]) => `
                             <li>
-                                <span class="domain-name">${domain}</span>
+                                <a href="/${domain}" class="domain-link" target="_blank" rel="noopener noreferrer" title="Validate ${domain} in new tab">${domain}</a>
                                 <span class="domain-count">${count.toLocaleString()}</span>
                             </li>
                         `).join('');
