@@ -1,7 +1,7 @@
 # DNSSEC Validator
 
-[![Docker Image Version (Official)](https://img.shields.io/docker/v/maboni82/dnssec-validator?style=for-the-badge&logo=docker&label=release)](https://hub.docker.com/r/maboni82/dnssec-validator)
-[![Docker Image Version (Dev)](https://img.shields.io/docker/v/maboni82/dnssec-validator?style=for-the-badge&logo=docker&label=dev&filter=dev*)](https://hub.docker.com/r/maboni82/dnssec-validator)
+[![GitHub Release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=github&label=release)](https://github.com/BondIT-ApS/dnssec-validator/releases/latest)
+[![GitHub Pre-release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?include_prereleases&style=for-the-badge&logo=github&label=dev)](https://github.com/BondIT-ApS/dnssec-validator/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BondIT-ApS/dnssec-validator/docker-publish.yml?branch=master&style=for-the-badge&logo=github)](https://github.com/BondIT-ApS/dnssec-validator/actions)
 [![GitHub Issues](https://img.shields.io/github/issues/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/issues)
