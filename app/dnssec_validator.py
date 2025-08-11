@@ -14,8 +14,10 @@ import hashlib
 import base64
 try:
     from .tlsa_validator import TLSAValidator
+    from .domain_utils import get_fallback_domains, has_subdomain
 except ImportError:
     from tlsa_validator import TLSAValidator
+    from domain_utils import get_fallback_domains, has_subdomain
 
 class DNSSECValidator:
     def __init__(self, domain):
@@ -70,6 +72,114 @@ class DNSSECValidator:
             # Don't fail the overall validation for TLSA issues
             
         return self.results
+    
+    def validate_with_fallback(self, original_input=None):
+        """Validate domain with subdomain fallback logic.
+        
+        If the original domain validation fails with 'invalid' status,
+        and the domain has subdomains, attempt to validate the root domain.
+        
+        Args:
+            original_input (str, optional): Original user input for reference
+            
+        Returns:
+            dict: Validation results with fallback information
+        """
+        # Get domains to try in fallback order
+        domains_to_try = get_fallback_domains(self.domain)
+        
+        results = {
+            'original_input': original_input or self.domain,
+            'requested_domain': self.domain,
+            'validation_attempts': [],
+            'final_result': None,
+            'fallback_used': False
+        }
+        
+        for i, domain in enumerate(domains_to_try):
+            is_fallback = i > 0
+            attempt_type = 'fallback' if is_fallback else 'primary'
+            
+            logging.info(f"Attempting {attempt_type} validation for domain: {domain}")
+            
+            # Create new validator for this domain
+            validator = DNSSECValidator(domain)
+            validation_result = validator.validate()
+            
+            # Store attempt details
+            attempt_info = {
+                'domain': domain,
+                'attempt_type': attempt_type,
+                'result': validation_result
+            }
+            results['validation_attempts'].append(attempt_info)
+            
+            # Check if this validation succeeded or if we should try fallback
+            if validation_result['status'] == 'valid':
+                # Success! Use this result
+                results['final_result'] = validation_result
+                results['fallback_used'] = is_fallback
+                break
+            elif validation_result['status'] in ['insecure', 'error']:
+                # These statuses don't warrant fallback - use this result
+                results['final_result'] = validation_result
+                results['fallback_used'] = is_fallback
+                break
+            elif validation_result['status'] == 'invalid' and i < len(domains_to_try) - 1:
+                # Invalid result and we have more domains to try - continue to fallback
+                continue
+            else:
+                # This was the last domain to try - use this result
+                results['final_result'] = validation_result
+                results['fallback_used'] = is_fallback
+                break
+        
+        # Enhance final result with fallback information
+        if results['final_result']:
+            final_result = results['final_result'].copy()
+            
+            # Add fallback metadata
+            final_result['fallback_info'] = {
+                'original_input': results['original_input'],
+                'requested_domain': results['requested_domain'],
+                'validated_domain': final_result['domain'],
+                'fallback_used': results['fallback_used'],
+                'total_attempts': len(results['validation_attempts'])
+            }
+            
+            # If fallback was used, add information about failed attempts
+            if results['fallback_used'] or len(results['validation_attempts']) > 1:
+                final_result['fallback_info']['attempts'] = []
+                for attempt in results['validation_attempts']:
+                    final_result['fallback_info']['attempts'].append({
+                        'domain': attempt['domain'],
+                        'type': attempt['attempt_type'],
+                        'status': attempt['result']['status'],
+                        'errors': attempt['result'].get('errors', [])
+                    })
+            
+            return final_result
+        
+        # Fallback: return error result if no validation succeeded
+        return {
+            'domain': self.domain,
+            'status': 'error',
+            'validation_time': datetime.utcnow().isoformat(),
+            'errors': ['All validation attempts failed'],
+            'fallback_info': {
+                'original_input': results['original_input'],
+                'requested_domain': results['requested_domain'],
+                'validated_domain': self.domain,
+                'fallback_used': True,
+                'total_attempts': len(results['validation_attempts']),
+                'attempts': [{
+                    'domain': attempt['domain'],
+                    'type': attempt['attempt_type'],
+                    'status': attempt['result']['status'],
+                    'errors': attempt['result'].get('errors', [])
+                } for attempt in results['validation_attempts']]
+            }
+        }
     
     def _validate_chain_of_trust(self):
         """Validate the complete chain of trust from root to domain"""
