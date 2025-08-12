@@ -29,7 +29,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function escapeHTML(str) {
-        return str.replace(/[&<>"']/g, function (m) {
+        // Handle non-string values by converting to string first
+        if (str === null || str === undefined) {
+            return '';
+        }
+        // Convert to string if it's not already a string
+        const stringValue = String(str);
+        return stringValue.replace(/[&<>"']/g, function (m) {
             switch (m) {
                 case '&': return '&amp;';
                 case '<': return '&lt;';
@@ -52,28 +58,28 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => displayResults(data))
             .catch(error => {
-                resultsContainer.innerHTML = '<p>Error: ' + error.message + '</p>';
+                resultsContainer.innerHTML = '<p>Error: ' + escapeHTML(error.message) + '</p>';
             });
     }
 
     function displayResults(data) {
-        let html = '<h2>Validation Results for ' + data.domain + '</h2>';
+        let html = '<h2>Validation Results for ' + escapeHTML(data.domain) + '</h2>';
         
-        // Status with appropriate styling
-        let statusClass = 'status-' + data.status;
-        html += '<p><strong>Status:</strong> <span class="' + statusClass + '">' + data.status.toUpperCase() + '</span></p>';
-        html += '<p><strong>Validation Time:</strong> ' + new Date(data.validation_time).toLocaleString() + '</p>';
+        // Status with appropriate styling  
+        let statusClass = 'status-' + escapeHTML(data.status);
+        html += '<p><strong>Status:</strong> <span class="' + statusClass + '">' + escapeHTML(data.status.toUpperCase()) + '</span></p>';
+        html += '<p><strong>Validation Time:</strong> ' + escapeHTML(new Date(data.validation_time).toLocaleString()) + '</p>';
 
         if (data.chain_of_trust && data.chain_of_trust.length > 0) {
             html += '<h3>Chain of Trust</h3>';
             data.chain_of_trust.forEach(function(zone) {
                 html += '<div class="chain-item">';
-                html += '<strong>' + zone.zone + '</strong> - <span class="status-' + zone.status + '">' + zone.status + '</span>';
+                html += '<strong>' + escapeHTML(zone.zone) + '</strong> - <span class="status-' + escapeHTML(zone.status) + '">' + escapeHTML(zone.status) + '</span>';
                 if (zone.algorithm) {
-                    html += '<br><small>Algorithm: ' + zone.algorithm + ', Key Tag: ' + zone.key_tag + '</small>';
+                    html += '<br><small>Algorithm: ' + escapeHTML(zone.algorithm) + ', Key Tag: ' + escapeHTML(zone.key_tag) + '</small>';
                 }
                 if (zone.error) {
-                    html += '<br><small class="status-error">Error: ' + zone.error + '</small>';
+                    html += '<br><small class="status-error">Error: ' + escapeHTML(zone.error) + '</small>';
                 }
                 html += '</div>';
             });
@@ -84,10 +90,10 @@ document.addEventListener('DOMContentLoaded', function() {
             html += '<h3>DNSKEY Records</h3>';
             data.records.dnskey.forEach(function(key) {
                 html += '<div class="chain-item">';
-                html += '<strong>Zone:</strong> ' + key.zone + '<br>';
-                html += '<strong>Algorithm:</strong> ' + key.algorithm + '<br>';
-                html += '<strong>Key Tag:</strong> ' + key.key_tag + '<br>';
-                html += '<strong>Flags:</strong> ' + key.flags;
+                html += '<strong>Zone:</strong> ' + escapeHTML(key.zone) + '<br>';
+                html += '<strong>Algorithm:</strong> ' + escapeHTML(key.algorithm) + '<br>';
+                html += '<strong>Key Tag:</strong> ' + escapeHTML(key.key_tag) + '<br>';
+                html += '<strong>Flags:</strong> ' + escapeHTML(key.flags);
                 html += '</div>';
             });
         }
@@ -96,17 +102,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.tlsa_summary && window.SHOW_TLSA_DANE === true) {
             html += '<h3>🔒 TLSA/DANE Validation</h3>';
             html += '<div class="chain-item">';
-            html += '<p><strong>Status:</strong> ' + data.tlsa_summary.status + '</p>';
-            html += '<p><strong>TLSA Records Found:</strong> ' + data.tlsa_summary.records_found + '</p>';
-            html += '<p><strong>DANE Status:</strong> ' + data.tlsa_summary.dane_status + '</p>';
-            html += '<p style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; font-style: italic;">' + data.tlsa_summary.message + '</p>';
+            html += '<p><strong>Status:</strong> ' + escapeHTML(data.tlsa_summary.status) + '</p>';
+            html += '<p><strong>TLSA Records Found:</strong> ' + escapeHTML(data.tlsa_summary.records_found) + '</p>';
+            html += '<p><strong>DANE Status:</strong> ' + escapeHTML(data.tlsa_summary.dane_status) + '</p>';
+            html += '<p style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; font-style: italic;">' + escapeHTML(data.tlsa_summary.message) + '</p>';
             html += '</div>';
         }
 
         if (data.errors && data.errors.length > 0) {
             html += '<h3>Errors</h3>';
             data.errors.forEach(function(error) {
-                html += '<div class="error-item">' + error + '</div>';
+                html += '<div class="error-item">' + escapeHTML(error) + '</div>';
             });
         }
         
