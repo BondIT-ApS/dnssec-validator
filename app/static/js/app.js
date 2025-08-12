@@ -29,7 +29,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function escapeHTML(str) {
-        return str.replace(/[&<>"']/g, function (m) {
+        // Handle non-string values by converting to string first
+        if (str === null || str === undefined) {
+            return '';
+        }
+        // Convert to string if it's not already a string
+        const stringValue = String(str);
+        return stringValue.replace(/[&<>"']/g, function (m) {
             switch (m) {
                 case '&': return '&amp;';
                 case '<': return '&lt;';
