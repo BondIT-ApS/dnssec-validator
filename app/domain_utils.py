@@ -187,6 +187,12 @@ def normalize_domain_input(user_input):
     if not domain or not is_valid_domain_format(domain):
         return None, 'invalid'
     
+    # Additional cleanup: remove www. prefix for all inputs
+    if domain.startswith('www.'):
+        cleaned_domain = domain[4:]
+        if is_valid_domain_format(cleaned_domain):
+            domain = cleaned_domain
+    
     return domain, input_type
 
 

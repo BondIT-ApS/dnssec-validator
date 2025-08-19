@@ -16,6 +16,7 @@ A **professional-grade** web-based DNSSEC validation tool that provides comprehe
 - **Complete Chain of Trust Validation**: Traces DNSSEC validation from root (.) → TLD → domain
 - **Real-time Analysis**: Live DNS queries with detailed step-by-step validation
 - **Visual Interface**: Clean web UI showing validation results with color-coded status
+- **Smart Input Processing**: Accepts both domain names and full URLs (automatically extracts domains)
 - **API Endpoint**: RESTful API for programmatic access
 - **Docker Support**: Easy deployment with Docker containers
 - **Multi-Algorithm Support**: Supports all DNSSEC algorithms (RSA, ECDSA, EdDSA)
@@ -63,9 +64,15 @@ Open your browser to `http://localhost:8080`
 ### Web Interface
 
 1. Navigate to the web interface
-2. Enter a domain name (e.g., `bondit.dk`)
+2. Enter a domain name or URL (e.g., `bondit.dk` or `https://bondit.dk/path`)
 3. Click "Validate DNSSEC"
 4. View the detailed validation report
+
+**Supported Input Formats:**
+- Plain domains: `bondit.dk`, `api.example.com`
+- URLs: `https://bondit.dk`, `http://example.com/path`
+- URLs are automatically parsed to extract the domain name
+- `www.` prefixes are automatically removed
 
 ### API Usage
 
@@ -74,6 +81,9 @@ Open your browser to `http://localhost:8080`
 ```bash
 # Validate a domain via API
 curl "http://localhost:8080/api/validate/bondit.dk"
+
+# Or validate using a URL (automatically extracts domain)
+curl "http://localhost:8080/api/validate/https://bondit.dk/path"
 
 # Response format
 {

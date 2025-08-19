@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from dnssec_validator import DNSSECValidator
 from models import RequestLog
+from domain_utils import normalize_domain_input, extract_domain_from_input
 import db_init
 
 # Initialize database based on environment variables before creating Flask app
@@ -361,7 +362,7 @@ timeseries_model = api.model('TimeSeriesData', {
 })
 
 # DNSSEC Validation endpoints
-@ns_validate.route('/<string:domain>')
+@ns_validate.route('/<path:domain>')
 @ns_validate.param('domain', 'The domain name to validate (e.g., bondit.dk)')
 class DNSSECValidation(Resource):
     @ns_validate.doc('validate_domain')
@@ -382,17 +383,31 @@ class DNSSECValidation(Resource):
         - RRSIG signature checking
         - TLSA/DANE validation (RFC 6698)
         
+        Accepts various input formats:
+        - Plain domain: bondit.dk
+        - URLs: https://bondit.dk/path
+        - Subdomains: api.bondit.dk
+        
         Returns detailed validation results including status, trust chain,
         TLSA validation summary, and all relevant DNSSEC records found.
         """
         try:
-            # Basic domain validation
-            if not domain or len(domain) > 253:
+            # Extract and normalize domain from various input formats
+            original_input = domain
+            normalized_domain, input_type = normalize_domain_input(domain)
+            
+            if not normalized_domain:
                 return {
-                    'domain': domain,
+                    'domain': original_input,
                     'status': 'error',
-                    'errors': ['Invalid domain format']
+                    'errors': ['Invalid domain format. Please enter a valid domain name or URL.']
                 }, 400
+            
+            # Log the domain extraction for debugging
+            if input_type == 'url':
+                logger.debug(f"Extracted domain '{normalized_domain}' from URL input: {original_input}")
+            
+            domain = normalized_domain
             
             logger.debug(f"Starting DNSSEC validation for domain: {domain}")
             validator = DNSSECValidator(domain)
@@ -408,7 +423,7 @@ class DNSSECValidation(Resource):
                 'errors': [sanitize_error(e)]
             }, 500
 
-@ns_validate.route('/<string:domain>/detailed')
+@ns_validate.route('/<path:domain>/detailed')
 @ns_validate.param('domain', 'The domain name to analyze in detail (e.g., bondit.dk)')
 class DNSSECDetailedValidation(Resource):
     @ns_validate.doc('validate_domain_detailed')
@@ -432,16 +447,30 @@ class DNSSECDetailedValidation(Resource):
         - Security best practice suggestions
         - Query timing information
         
+        Accepts various input formats:
+        - Plain domain: bondit.dk
+        - URLs: https://bondit.dk/path
+        - Subdomains: api.bondit.dk
+        
         Returns extensive technical details for debugging and analysis.
         """
         try:
-            # Basic domain validation
-            if not domain or len(domain) > 253:
+            # Extract and normalize domain from various input formats
+            original_input = domain
+            normalized_domain, input_type = normalize_domain_input(domain)
+            
+            if not normalized_domain:
                 return {
-                    'domain': domain,
+                    'domain': original_input,
                     'status': 'error',
-                    'errors': ['Invalid domain format']
+                    'errors': ['Invalid domain format. Please enter a valid domain name or URL.']
                 }, 400
+            
+            # Log the domain extraction for debugging
+            if input_type == 'url':
+                logger.debug(f"Extracted domain '{normalized_domain}' from URL input for detailed analysis: {original_input}")
+            
+            domain = normalized_domain
             
             logger.debug(f"Starting detailed DNSSEC analysis for domain: {domain}")
             validator = DNSSECValidator(domain)
@@ -774,21 +803,53 @@ def stats_dashboard():
     logger.info("Analytics dashboard accessed")
     return render_template('stats.html')
 
-@app.route('/<string:domain>')
+@app.route('/<path:domain>')
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def check_domain_direct(domain):
-    """Direct access like /bondit.dk - render page with pre-filled domain"""
-    logger.info(f"Direct domain access: {domain}")
+    """Direct access like /bondit.dk or /https://example.com - render page with pre-filled domain"""
+    
+    # Extract and normalize domain from input (could be URL)
+    original_input = domain
+    normalized_domain, input_type = normalize_domain_input(domain)
+    
+    if not normalized_domain:
+        # If invalid domain, still render page but let frontend handle validation
+        logger.warning(f"Invalid domain format in direct access: {original_input}")
+        show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
+        return render_template('index.html', domain=original_input, show_tlsa_dane=show_tlsa_dane)
+    
+    # Log successful domain extraction
+    if input_type == 'url':
+        logger.info(f"Direct access with URL '{original_input}' extracted to domain: {normalized_domain}")
+    else:
+        logger.info(f"Direct domain access: {normalized_domain}")
+    
     show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
-    return render_template('index.html', domain=domain, show_tlsa_dane=show_tlsa_dane)
+    return render_template('index.html', domain=normalized_domain, show_tlsa_dane=show_tlsa_dane)
 
-@app.route('/<string:domain>/detailed')
+@app.route('/<path:domain>/detailed')
 @limiter.limit(f"{rate_limits['web_minute']} per minute; {rate_limits['web_hour']} per hour")
 def check_domain_detailed(domain):
-    """Detailed DNSSEC analysis page like /bondit.dk/detailed"""
-    logger.info(f"Detailed domain analysis access: {domain}")
+    """Detailed DNSSEC analysis page like /bondit.dk/detailed or /https://example.com/detailed"""
+    
+    # Extract and normalize domain from input (could be URL)
+    original_input = domain
+    normalized_domain, input_type = normalize_domain_input(domain)
+    
+    if not normalized_domain:
+        # If invalid domain, still render page but let frontend handle validation
+        logger.warning(f"Invalid domain format in detailed access: {original_input}")
+        show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
+        return render_template('detailed.html', domain=original_input, show_tlsa_dane=show_tlsa_dane)
+    
+    # Log successful domain extraction
+    if input_type == 'url':
+        logger.info(f"Detailed access with URL '{original_input}' extracted to domain: {normalized_domain}")
+    else:
+        logger.info(f"Detailed domain analysis access: {normalized_domain}")
+    
     show_tlsa_dane = os.getenv('SHOW_VALIDATION_TLSA_DANE', 'false').lower() == 'true'
-    return render_template('detailed.html', domain=domain, show_tlsa_dane=show_tlsa_dane)
+    return render_template('detailed.html', domain=normalized_domain, show_tlsa_dane=show_tlsa_dane)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)

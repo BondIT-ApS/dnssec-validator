@@ -5,8 +5,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Normalize domain input on blur (when field loses focus)
     domainInput.addEventListener('blur', function() {
-        const normalizedDomain = domainInput.value.trim().toLowerCase();
-        domainInput.value = normalizedDomain;
+        const normalizedDomain = normalizeDomainInput(domainInput.value);
+        if (normalizedDomain && normalizedDomain !== domainInput.value) {
+            domainInput.value = normalizedDomain;
+        }
     });
     
     // Optional: Real-time normalization while typing (commented out by default)
@@ -20,13 +22,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        const domain = domainInput.value.trim().toLowerCase();
-        if (domain) {
+        const normalizedDomain = normalizeDomainInput(domainInput.value);
+        if (normalizedDomain) {
             // Ensure input field shows the final normalized domain
-            domainInput.value = domain;
-            validateDomain(domain);
+            domainInput.value = normalizedDomain;
+            validateDomain(normalizedDomain);
         }
     });
+
+    function normalizeDomainInput(input) {
+        if (!input) return '';
+        
+        let domain = input.trim().toLowerCase();
+        
+        // Handle URLs
+        if (domain.startsWith('http://') || domain.startsWith('https://') || domain.startsWith('ftp://')) {
+            try {
+                const url = new URL(domain);
+                domain = url.hostname;
+            } catch (e) {
+                // If URL parsing fails, try regex fallback
+                domain = domain.replace(/^[a-z]+:\/\//, '').split('/')[0].split('?')[0].split('#')[0];
+            }
+        } else if (domain.includes('://')) {
+            // Handle malformed URLs or URLs with unsupported protocols
+            const parts = domain.split('://');
+            if (parts.length >= 2) {
+                domain = parts[1].split('/')[0].split('?')[0].split('#')[0];
+            }
+        }
+        
+        // Remove www. prefix
+        if (domain.startsWith('www.')) {
+            domain = domain.substring(4);
+        }
+        
+        // Remove spaces (also handles space removal feature from issue #84)
+        domain = domain.replace(/\s+/g, '');
+        
+        // Remove port if present
+        domain = domain.split(':')[0];
+        
+        // Remove trailing paths, queries, etc. (additional cleanup)
+        domain = domain.split('/')[0].split('?')[0].split('#')[0];
+        
+        return domain;
+    }
 
     function escapeHTML(str) {
         // Handle non-string values by converting to string first

@@ -18,7 +18,7 @@
             </nav>
         </header>
         <form id="dnssec-form">
-            <input type="text" id="domain-input" placeholder="Enter a domain name (e.g., bondit.dk)" value="{{ domain or '' }}" required>
+            <input type="text" id="domain-input" placeholder="Enter a domain name or URL (e.g., bondit.dk or https://bondit.dk)" value="{{ domain or '' }}" required>
             <button type="submit">Validate DNSSEC</button>
         </form>
         <div id="results-container"></div>
