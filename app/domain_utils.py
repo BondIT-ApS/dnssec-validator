@@ -23,7 +23,7 @@ def extract_domain_from_input(user_input):
         return None
     
     # Clean and normalize input
-    user_input = user_input.strip().lower()
+    user_input = user_input.strip().replace(' ', '').lower()
     
     # If it looks like a URL, parse it
     if user_input.startswith(('http://', 'https://', 'ftp://')):

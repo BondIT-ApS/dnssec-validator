@@ -386,6 +386,9 @@ class DNSSECValidation(Resource):
         TLSA validation summary, and all relevant DNSSEC records found.
         """
         try:
+            # Normalize domain input (remove spaces, convert to lowercase)
+            domain = domain.strip().replace(' ', '').lower()
+            
             # Basic domain validation
             if not domain or len(domain) > 253:
                 return {
@@ -435,6 +438,9 @@ class DNSSECDetailedValidation(Resource):
         Returns extensive technical details for debugging and analysis.
         """
         try:
+            # Normalize domain input (remove spaces, convert to lowercase)
+            domain = domain.strip().replace(' ', '').lower()
+            
             # Basic domain validation
             if not domain or len(domain) > 253:
                 return {
