@@ -156,10 +156,13 @@ class TLSAValidator:
     def _get_tls_certificate(self, port, timeout):
         """Retrieve TLS certificate from the server"""
         try:
-            # Create SSL context
+            # Create SSL context with secure TLS settings
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
+            
+            # Enforce minimum TLS version 1.2 for security
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
             
             # Connect and get certificate
             with socket.create_connection((self.domain, port), timeout=timeout) as sock:
