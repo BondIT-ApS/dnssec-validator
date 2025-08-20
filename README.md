@@ -16,8 +16,10 @@ A **professional-grade** web-based DNSSEC validation tool that provides comprehe
 - **Complete Chain of Trust Validation**: Traces DNSSEC validation from root (.) → TLD → domain
 - **Real-time Analysis**: Live DNS queries with detailed step-by-step validation
 - **Visual Interface**: Clean web UI showing validation results with color-coded status
-- **Smart Input Processing**: Accepts domain names with automatic space removal (e.g., `"bond it.dk"` → `"bondit.dk"`)
-- **API Endpoint**: RESTful API for programmatic access
+- **Smart Input Processing**: Accepts both domain names and full URLs with automatic parsing and normalization
+  - Automatic space removal (e.g., `"bond it.dk"` → `"bondit.dk"`)
+  - URL parsing (e.g., `"https://example.com/path"` → `"example.com"`)
+- **API Endpoint**: RESTful API for programmatic access with URL support
 - **Docker Support**: Easy deployment with Docker containers
 - **Multi-Algorithm Support**: Supports all DNSSEC algorithms (RSA, ECDSA, EdDSA)
 - **Detailed Reporting**: Shows DNSKEY, DS, RRSIG records with validation status
@@ -75,6 +77,10 @@ Open your browser to `http://localhost:8080`
 ```bash
 # Validate a domain via API
 curl "http://localhost:8080/api/validate/bondit.dk"
+
+# Or validate using a URL (automatically extracts domain)
+curl "http://localhost:8080/api/validate/https://bondit.dk"
+curl "http://localhost:8080/api/validate/https://example.com/path/to/page"
 
 # Response format
 {
@@ -134,6 +140,16 @@ curl "http://localhost:8080/api/validate/bondit.dk"
   },
   "errors": []
 }
+```
+
+#### Detailed DNSSEC Analysis
+
+```bash
+# Get detailed validation results for a domain
+curl "http://localhost:8080/api/validate/detailed/bondit.dk"
+
+# Or with URL input (automatically extracts domain)
+curl "http://localhost:8080/api/validate/detailed/https://bondit.dk/some/path"
 ```
 
 #### Health Check Endpoints

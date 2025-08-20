@@ -5,10 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Normalize domain input on blur (when field loses focus)
     domainInput.addEventListener('blur', function() {
-        const normalizedDomain = domainInput.value
-            .trim()                    // Remove leading/trailing spaces
-            .replace(/\s+/g, '')       // Remove all internal spaces
-            .toLowerCase();            // Convert to lowercase
+        const normalizedDomain = normalizeDomainInput(domainInput.value);
         domainInput.value = normalizedDomain;
     });
     
@@ -23,16 +20,51 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        const domain = domainInput.value
-            .trim()                    // Remove leading/trailing spaces
-            .replace(/\s+/g, '')       // Remove all internal spaces
-            .toLowerCase();            // Convert to lowercase
+        const domain = normalizeDomainInput(domainInput.value);
         if (domain) {
             // Ensure input field shows the final normalized domain
             domainInput.value = domain;
             validateDomain(domain);
         }
     });
+    
+    function normalizeDomainInput(input) {
+        if (!input) return '';
+        
+        let domain = input.trim().toLowerCase();
+        
+        // Handle URLs
+        if (domain.startsWith('http://') || domain.startsWith('https://')) {
+            try {
+                const url = new URL(domain);
+                domain = url.hostname;
+            } catch (e) {
+                // If URL parsing fails, try regex fallback
+                domain = domain.replace(/^https?:\/\//, '').split('/')[0];
+            }
+        }
+        
+        // Handle other protocol URLs (like ftp://)
+        if (domain.includes('://')) {
+            domain = domain.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '').split('/')[0];
+        }
+        
+        // Remove www. prefix
+        if (domain.startsWith('www.')) {
+            domain = domain.substring(4);
+        }
+        
+        // Remove spaces and convert to lowercase
+        domain = domain.replace(/\s+/g, '').toLowerCase();
+        
+        // Remove any remaining path, query, or fragment
+        domain = domain.split('/')[0].split('?')[0].split('#')[0];
+        
+        // Remove port if present
+        domain = domain.split(':')[0];
+        
+        return domain;
+    }
 
     function escapeHTML(str) {
         // Handle non-string values by converting to string first

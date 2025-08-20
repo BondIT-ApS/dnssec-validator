@@ -361,8 +361,8 @@ timeseries_model = api.model('TimeSeriesData', {
 })
 
 # DNSSEC Validation endpoints
-@ns_validate.route('/<string:domain>')
-@ns_validate.param('domain', 'The domain name to validate (e.g., bondit.dk)')
+@ns_validate.route('/<path:domain>')
+@ns_validate.param('domain', 'The domain name or URL to validate (e.g., bondit.dk or https://bondit.dk)')
 class DNSSECValidation(Resource):
     @ns_validate.doc('validate_domain')
     @ns_validate.expect()
@@ -386,16 +386,26 @@ class DNSSECValidation(Resource):
         TLSA validation summary, and all relevant DNSSEC records found.
         """
         try:
-            # Normalize domain input (remove spaces, convert to lowercase)
-            domain = domain.strip().replace(' ', '').lower()
+            # Import domain utilities for URL parsing
+            from domain_utils import extract_domain_from_input, is_valid_domain_format
             
-            # Basic domain validation
-            if not domain or len(domain) > 253:
+            # Log original input for debugging
+            original_input = domain
+            logger.debug(f"API received input: {original_input}")
+            
+            # Extract domain from URL or validate direct domain input
+            extracted_domain = extract_domain_from_input(domain)
+            
+            if not extracted_domain or not is_valid_domain_format(extracted_domain):
                 return {
-                    'domain': domain,
+                    'domain': original_input,
                     'status': 'error',
-                    'errors': ['Invalid domain format']
+                    'errors': [f'Invalid domain format or unable to extract domain from: {original_input}']
                 }, 400
+                
+            # Use the extracted domain for validation
+            domain = extracted_domain
+            logger.debug(f"Extracted domain for validation: {domain}")
             
             logger.debug(f"Starting DNSSEC validation for domain: {domain}")
             validator = DNSSECValidator(domain)
@@ -411,8 +421,8 @@ class DNSSECValidation(Resource):
                 'errors': [sanitize_error(e)]
             }, 500
 
-@ns_validate.route('/<string:domain>/detailed')
-@ns_validate.param('domain', 'The domain name to analyze in detail (e.g., bondit.dk)')
+@ns_validate.route('/<path:domain>/detailed')
+@ns_validate.param('domain', 'The domain name or URL to analyze in detail (e.g., bondit.dk or https://bondit.dk)')
 class DNSSECDetailedValidation(Resource):
     @ns_validate.doc('validate_domain_detailed')
     @ns_validate.expect()
@@ -438,16 +448,26 @@ class DNSSECDetailedValidation(Resource):
         Returns extensive technical details for debugging and analysis.
         """
         try:
-            # Normalize domain input (remove spaces, convert to lowercase)
-            domain = domain.strip().replace(' ', '').lower()
+            # Import domain utilities for URL parsing
+            from domain_utils import extract_domain_from_input, is_valid_domain_format
             
-            # Basic domain validation
-            if not domain or len(domain) > 253:
+            # Log original input for debugging
+            original_input = domain
+            logger.debug(f"API detailed received input: {original_input}")
+            
+            # Extract domain from URL or validate direct domain input
+            extracted_domain = extract_domain_from_input(domain)
+            
+            if not extracted_domain or not is_valid_domain_format(extracted_domain):
                 return {
-                    'domain': domain,
+                    'domain': original_input,
                     'status': 'error',
-                    'errors': ['Invalid domain format']
+                    'errors': [f'Invalid domain format or unable to extract domain from: {original_input}']
                 }, 400
+                
+            # Use the extracted domain for validation
+            domain = extracted_domain
+            logger.debug(f"Extracted domain for detailed validation: {domain}")
             
             logger.debug(f"Starting detailed DNSSEC analysis for domain: {domain}")
             validator = DNSSECValidator(domain)
