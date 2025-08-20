@@ -16,6 +16,7 @@ A **professional-grade** web-based DNSSEC validation tool that provides comprehe
 - **Complete Chain of Trust Validation**: Traces DNSSEC validation from root (.) → TLD → domain
 - **Real-time Analysis**: Live DNS queries with detailed step-by-step validation
 - **Visual Interface**: Clean web UI showing validation results with color-coded status
+- **Smart Input Processing**: Accepts domain names with automatic space removal (e.g., `"bond it.dk"` → `"bondit.dk"`)
 - **API Endpoint**: RESTful API for programmatic access
 - **Docker Support**: Easy deployment with Docker containers
 - **Multi-Algorithm Support**: Supports all DNSSEC algorithms (RSA, ECDSA, EdDSA)

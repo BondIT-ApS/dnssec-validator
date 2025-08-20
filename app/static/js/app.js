@@ -5,7 +5,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Normalize domain input on blur (when field loses focus)
     domainInput.addEventListener('blur', function() {
-        const normalizedDomain = domainInput.value.trim().toLowerCase();
+        const normalizedDomain = domainInput.value
+            .trim()                    // Remove leading/trailing spaces
+            .replace(/\s+/g, '')       // Remove all internal spaces
+            .toLowerCase();            // Convert to lowercase
         domainInput.value = normalizedDomain;
     });
     
@@ -20,7 +23,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        const domain = domainInput.value.trim().toLowerCase();
+        const domain = domainInput.value
+            .trim()                    // Remove leading/trailing spaces
+            .replace(/\s+/g, '')       // Remove all internal spaces
+            .toLowerCase();            // Convert to lowercase
         if (domain) {
             // Ensure input field shows the final normalized domain
             domainInput.value = domain;
