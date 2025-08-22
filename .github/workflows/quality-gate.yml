@@ -1,4 +1,5 @@
 name: Quality Gate
+# Universal quality gate workflow using BondIT's centralized system
 on:
   push:
     branches: [master]
