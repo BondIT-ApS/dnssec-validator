@@ -1,0 +1,20 @@
+name: Quality Gate
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  quality-gate:
+    uses: BondIT-ApS/demo-repository/.github/workflows/quality-gate.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      actions: read
+    with:
+      # Open source project with comprehensive testing needs
+      max-pr-size: '800'            # Keep changes focused and reviewable
+      min-test-coverage: '85'       # High quality bar for DNS security tool
+      security-scan-enabled: 'true' # Critical security tool - thorough scanning required
