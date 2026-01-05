@@ -1,7 +1,6 @@
 # DNSSEC Validator
 
 [![GitHub Release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=github&label=release)](https://github.com/BondIT-ApS/dnssec-validator/releases/latest)
-[![GitHub Pre-release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?include_prereleases&style=for-the-badge&logo=github&label=dev)](https://github.com/BondIT-ApS/dnssec-validator/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BondIT-ApS/dnssec-validator/docker-publish.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/BondIT-ApS/dnssec-validator/actions)
 [![Quality Gate](https://img.shields.io/badge/Quality%20Gate-10.0%2F10-brightgreen?style=for-the-badge&logo=python)](https://github.com/BondIT-ApS/dnssec-validator/actions)
@@ -38,11 +37,42 @@ The production deployment includes:
 ## 🐳 Quick Start with Docker
 
 ```bash
-# Run the container
+# Run the container (latest version)
 docker run -p 8080:8080 maboni82/dnssec-validator:latest
+
+# Or run a specific version
+docker run -p 8080:8080 maboni82/dnssec-validator:26.1.1
 
 # Open your browser to http://localhost:8080
 ```
+
+## 🏷️ Versioning
+
+This project uses **semantic versioning** with a `YY.M.PATCH` format:
+
+- **YY.M** = Year and Month (e.g., `26.1` for January 2026)
+- **PATCH** = Incremental patch number (starts at 0 each month)
+
+### Version Examples
+
+- `26.1.0` - First release of January 2026 (monthly release on 1st)
+- `26.1.1`, `26.1.2`, `26.1.3` - Patch releases during January
+- `26.2.0` - First release of February 2026 (monthly release on 1st)
+
+### Docker Tags
+
+- `latest` - Always points to the most recent release
+- `YY.M.PATCH` - Specific version (e.g., `26.1.3`)
+- `YY.M` - Latest patch for that month (e.g., `26.1`)
+
+### Release Schedule
+
+- **Monthly Releases**: Created on the 1st of each month (`YY.M.0`)
+- **Patch Releases**: Automatically created when PRs merge to main
+
+### Release Notes
+
+View all releases and changelogs on the [Releases page](https://github.com/BondIT-ApS/dnssec-validator/releases).
 
 ## 🔧 Manual Installation
 
