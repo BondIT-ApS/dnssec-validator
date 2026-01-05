@@ -1,3 +1,7 @@
+import logging
+import time
+from datetime import datetime
+
 import dns.resolver
 import dns.dnssec
 import dns.name
@@ -6,15 +10,9 @@ import dns.rdataclass
 import dns.rrset
 import dns.query
 import dns.message
-from datetime import datetime, timezone
-import logging
-import os
-import time
-import hashlib
-import base64
 
-try:
-    from .tlsa_validator import TLSAValidator
+from tlsa_validator import TLSAValidator
+from domain_utils import normalize_domain, is_apex_domain
     from .domain_utils import get_fallback_domains, has_subdomain
 except ImportError:
     from tlsa_validator import TLSAValidator

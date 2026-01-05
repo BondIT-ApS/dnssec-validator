@@ -1,14 +1,15 @@
+import logging
+import os
+import time
+from datetime import datetime, timezone
+
+import psutil
 from flask import Flask, jsonify, render_template, request, g
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_restx import Api, Resource, fields
 from flask_talisman import Talisman
-import logging
-import os
-import time
-import psutil
-from datetime import datetime, timezone
 
 from dnssec_validator import DNSSECValidator
 from models import RequestLog
@@ -99,9 +100,11 @@ def setup_logging():
     # Configure log format
     if structured_logging:
         # JSON structured logging format
-        formatter = logging.Formatter(
-            '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "module": "%(name)s", "message": "%(message)s", "lineno": %(lineno)d}'
+        json_format = (
+            '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
+            '"module": "%(name)s", "message": "%(message)s", "lineno": %(lineno)d}'
         )
+        formatter = logging.Formatter(json_format)
     else:
         # Standard logging format
         formatter = logging.Formatter(
@@ -170,10 +173,9 @@ def get_client_ip():
     """Get the real client IP address considering proxies"""
     if request.headers.get("X-Forwarded-For"):
         return request.headers.get("X-Forwarded-For").split(",")[0].strip()
-    elif request.headers.get("X-Real-IP"):
+    if request.headers.get("X-Real-IP"):
         return request.headers.get("X-Real-IP")
-    else:
-        return request.remote_addr or "unknown"
+    return request.remote_addr or "unknown"
 
 
 def should_log_request():
@@ -882,12 +884,11 @@ def get_uptime():
 
     if days > 0:
         return f"{days}d {hours}h {minutes}m {seconds}s"
-    elif hours > 0:
+    if hours > 0:
         return f"{hours}h {minutes}m {seconds}s"
-    elif minutes > 0:
+    if minutes > 0:
         return f"{minutes}m {seconds}s"
-    else:
-        return f"{seconds}s"
+    return f"{seconds}s"
 
 
 def check_dns_resolver():
@@ -911,8 +912,7 @@ def check_memory_usage():
 
         if memory_percent < threshold:
             return "ok"
-        else:
-            return "warning"
+        return "warning"
     except Exception as e:
         logger.warning(f"Memory check failed: {str(e)}")
         return "error"

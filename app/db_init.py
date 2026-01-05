@@ -9,7 +9,6 @@ set at startup, including database recreation and truncation.
 import os
 import sys
 import time
-from datetime import datetime
 from models import influx_logger
 
 

@@ -1,15 +1,15 @@
-import ssl
-import socket
 import hashlib
+import logging
+import socket
+import ssl
+import time
+from datetime import datetime
+
 import dns.resolver
 import dns.name
 import dns.rdatatype
 import dns.exception
-from datetime import datetime, timezone
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-import logging
-import time
 
 
 class TLSAValidator:
