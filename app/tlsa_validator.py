@@ -3,13 +3,14 @@ import logging
 import socket
 import ssl
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import dns.resolver
 import dns.name
 import dns.rdatatype
 import dns.exception
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 
 
 class TLSAValidator:

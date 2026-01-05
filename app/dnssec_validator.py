@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import dns.resolver
 import dns.dnssec
@@ -12,11 +12,12 @@ import dns.query
 import dns.message
 
 from tlsa_validator import TLSAValidator
-from domain_utils import normalize_domain, is_apex_domain
-    from .domain_utils import get_fallback_domains, has_subdomain
-except ImportError:
-    from tlsa_validator import TLSAValidator
-    from domain_utils import get_fallback_domains, has_subdomain
+from domain_utils import (
+    normalize_domain,
+    is_apex_domain,
+    get_fallback_domains,
+    has_subdomain,
+)
 
 
 class DNSSECValidator:
