@@ -1,64 +1,70 @@
-name: Build and Push Docker Image (PR and tags)
+name: 🚀 LEGO Production Build & Deploy
 
 on:
   push:
-    tags:
-      - 'v*'
-  pull_request:
-    branches:
-      - master
+    branches: [main]
+  workflow_dispatch:
 
-env:
-  REGISTRY_IMAGE: maboni82/dnssec-validator
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  build-and-push:
+  # 🏢 Production LEGO Assembly Line
+  production-build:
+    name: 🐳 Build DNSSEC Validator Docker Image
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: 📎 Get LEGO Instructions (Checkout)
+        uses: actions/checkout@v6
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: 🌍 Set up Multi-Platform Builder (QEMU)
+        uses: docker/setup-qemu-action@v3
 
-    - name: Log in to Docker Hub (for tags only)
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: 🔧 Prepare Assembly Line (Docker Buildx)
+        uses: docker/setup-buildx-action@v3
+        id: buildx
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY_IMAGE }}
-        tags: |
-          # Version tags for releases (vX.Y or vX.Y.Z)
-          type=ref,event=tag
-          # PR tags for pull requests
-          type=ref,event=pr
+      - name: 🔑 Connect to LEGO Warehouse (Docker Hub)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: 🏷️ Generate Semantic Version Tag
+        id: version
+        run: |
+          # Generate YY.M format from current date
+          YEAR_MONTH=$(date +'%y.%-m')
+          
+          # Use GitHub run number as patch version for simplicity
+          # This ensures each build gets an incrementing patch number
+          PATCH_VERSION="${{ github.run_number }}"
+          
+          # Create semantic version: YY.M.PATCH
+          VERSION="${YEAR_MONTH}.${PATCH_VERSION}"
+          YEAR_MONTH_TAG="${YEAR_MONTH}"
+          
+          # Set environment variables for use in subsequent steps
+          echo "version=${VERSION}" >> "$GITHUB_ENV"
+          echo "year_month=${YEAR_MONTH_TAG}" >> "$GITHUB_ENV"
+          
+          echo "🏷️ Building semantic version: ${VERSION}"
+          echo "📅 Year/Month tag: ${YEAR_MONTH_TAG}"
+          echo "🔢 Run number: ${PATCH_VERSION}"
 
-    - name: Update Docker Hub Description (on version tags)
-      if: startsWith(github.ref, 'refs/tags/v')
-      uses: peter-evans/dockerhub-description@v4
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-        repository: ${{ env.REGISTRY_IMAGE }}
-        readme-filepath: ./README.md
+      - name: 🏢 Build & Push DNSSEC Validator Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            maboni82/dnssec-validator:latest
+            maboni82/dnssec-validator:${{ env.version }}
+            maboni82/dnssec-validator:${{ env.year_month }}
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
