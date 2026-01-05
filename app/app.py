@@ -168,6 +168,19 @@ logger.debug(f"Structured logging enabled: {is_structured}")
 logger.debug(f"Log file: {os.getenv('LOG_FILE', 'None - console only')}")
 
 
+# BondIT attribution configuration
+def show_attribution():
+    """Check if BondIT attribution footer should be shown"""
+    attribution = os.getenv("SHOW_BONDIT_ATTRIBUTION", "true").lower()
+    return attribution in ["true", "1", "yes"]  # Support true, 1, yes for flexibility
+
+
+@app.context_processor
+def inject_attribution():
+    """Make attribution setting available to all templates"""
+    return {"show_attribution": show_attribution()}
+
+
 # Request logging functionality
 def get_client_ip():
     """Get the real client IP address considering proxies"""

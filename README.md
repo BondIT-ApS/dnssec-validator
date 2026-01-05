@@ -461,6 +461,52 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - [ ] [Implement caching for faster responses](https://github.com/BondIT-ApS/dnssec-validator/issues/36)
 - [ ] [Add support for internationalized domain names (IDN)](https://github.com/BondIT-ApS/dnssec-validator/issues/37)
 
+## 🎨 BondIT Attribution Footer
+
+The DNSSEC Validator includes an optional attribution footer that shows gratitude to BondIT ApS for building and maintaining the tool. The footer appears at the bottom of all web pages.
+
+### Footer Content
+
+When enabled, the footer displays:
+- **Built with ❤️ by BondIT ApS** with link to [https://bondit.dk](https://bondit.dk)
+- **View on GitHub** link to the repository
+
+### Configuration
+
+The attribution footer is **enabled by default** but can be disabled using an environment variable:
+
+```bash
+# Show attribution footer (default)
+SHOW_BONDIT_ATTRIBUTION=true
+
+# Hide attribution footer
+SHOW_BONDIT_ATTRIBUTION=false
+```
+
+The environment variable accepts the following values for enabling:
+- `true` (recommended)
+- `1`
+- `yes`
+
+Any other value (including `false`) will disable the footer.
+
+### Docker Compose Example
+
+```yaml
+services:
+  dnssec-validator:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=production
+      - SHOW_BONDIT_ATTRIBUTION=true  # Show footer (default)
+```
+
+### Why Attribution?
+
+We believe in open source and free access to security tools. The optional attribution footer is a simple way to show appreciation for the development and maintenance of this tool. You're free to disable it, but we'd appreciate it if you kept it enabled! 🙏
+
 ## 🛡️ Rate Limiting
 
 The DNSSEC Validator includes comprehensive rate limiting to ensure fair usage and prevent abuse. Rate limits are applied per IP address and are configurable via environment variables.
