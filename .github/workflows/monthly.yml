@@ -2,15 +2,15 @@ name: monthly
 
 on:
   schedule:
-    # Second Sunday of month at 21:12 local time in Europe/Copenhagen, accounting for DST:
-    # - Apr–Oct (CEST, UTC+2) => 19:12 UTC on Sundays 8-14
-    - cron: "12 19 8-14 4-10 0"
-    # - Nov–Mar (CET, UTC+1) => 20:12 UTC on Sundays 8-14
-    - cron: "12 20 8-14 11,12,1-3 0"
+    # 7th of every month at 04:00 CET
+    # - Apr–Oct (CEST, UTC+2) => 02:00 UTC
+    - cron: "0 2 7 4-10 *"
+    # - Nov–Mar (CET, UTC+1) => 03:00 UTC
+    - cron: "0 3 7 11,12,1-3 *"
   workflow_dispatch:
     inputs:
       force_run:
-        description: 'Force monthly build (ignore second-sunday check)'
+        description: 'Force monthly build (ignore date check)'
         required: false
         default: 'false'
         type: boolean
@@ -27,47 +27,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: main
 
-      - name: Decide if today is second Sunday of month (Europe/Copenhagen)
+      - name: Decide if today is 7th of month (Europe/Copenhagen)
         id: when
         shell: bash
         run: |
-          FIRST_OF_MONTH=$(date +'%Y-%m-01')
-          DOW=$(date -d "$FIRST_OF_MONTH" +%u)  # 1..7 Mon..Sun
-          
-          # Calculate days to first Sunday of the month
-          # If first of month is Sunday (DOW=7), then it's day 1
-          # Otherwise, calculate days needed to reach first Sunday
-          if [[ $DOW -eq 7 ]]; then
-            DAYS_TO_FIRST_SUNDAY=0
-          else
-            DAYS_TO_FIRST_SUNDAY=$((7 - DOW))
-          fi
-          
-          # First Sunday of the month
-          FIRST_SUNDAY=$(date -d "$FIRST_OF_MONTH +$DAYS_TO_FIRST_SUNDAY days" +%Y-%m-%d)
-          
-          # Second Sunday is exactly 7 days after first Sunday
-          SECOND_SUNDAY=$(date -d "$FIRST_SUNDAY +7 days" +%Y-%m-%d)
-          
+          DAY_OF_MONTH=$(date +'%d')
           TODAY=$(date +%Y-%m-%d)
           
           echo "📅 Checking monthly build conditions:"
           echo "   Today: $TODAY ($(date +'%A'))"
-          echo "   First of month: $FIRST_OF_MONTH (day-of-week: $DOW)"
-          echo "   First Sunday: $FIRST_SUNDAY"
-          echo "   Second Sunday: $SECOND_SUNDAY"
+          echo "   Day of month: $DAY_OF_MONTH"
           echo "   Force run: ${{ inputs.force_run }}"
           
-          echo "SECOND_SUNDAY=$SECOND_SUNDAY" >> "$GITHUB_OUTPUT"
           echo "TODAY=$TODAY" >> "$GITHUB_OUTPUT"
           
-          if [[ "${{ inputs.force_run }}" == "true" ]] || [[ "$TODAY" == "$SECOND_SUNDAY" ]]; then
+          if [[ "${{ inputs.force_run }}" == "true" ]] || [[ "$DAY_OF_MONTH" == "07" ]]; then
             echo "✅ Running monthly build!"
             echo "RUN=true" >> "$GITHUB_OUTPUT"
           else
-            echo "⏸️ Skipping - not second Sunday and not forced"
+            echo "⏸️ Skipping - not 7th of month and not forced"
             echo "RUN=false" >> "$GITHUB_OUTPUT"
           fi
 
