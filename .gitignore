@@ -117,3 +117,6 @@ dmypy.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Warp AI development documentation (local only)
+WARP.md
