@@ -80,4 +80,5 @@ jobs:
             echo "🔨 Building locally (no push)..."
           fi
           
+          # shellcheck disable=SC2086
           docker buildx build $BUILD_ARGS .
