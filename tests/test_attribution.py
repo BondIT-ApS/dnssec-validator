@@ -138,7 +138,7 @@ class TestAttributionIntegration:
         html = response.data.decode("utf-8")
 
         # Check for attribution footer content
-        assert "Built with ❤️ by" in html or "Built with" in html
+        assert "Made with ❤️, ☕, and 🧱 by" in html or "Made with" in html
         assert "BondIT ApS" in html
         assert "https://bondit.dk" in html
         assert "https://github.com/BondIT-ApS/dnssec-validator" in html
