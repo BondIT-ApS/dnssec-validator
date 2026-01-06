@@ -10,10 +10,40 @@ permissions:
   packages: write
 
 jobs:
+  # 📊 Upload Coverage to Codecov (main branch)
+  codecov-main:
+    name: 📊 Upload Coverage Report (Main Branch)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download coverage report from last PR
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: pr-quality-gate.yml
+          name: coverage-report
+          path: .
+          search_artifacts: true
+
+      - name: Upload coverage to Codecov
+        if: hashFiles('coverage.xml') != ''
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: unittests
+          name: dnssec-validator-main-coverage
+          fail_ci_if_error: false
+          verbose: true
+
   # 🏢 Production LEGO Assembly Line
   production-build:
     name: 🐳 Build DNSSEC Validator Docker Image
     runs-on: ubuntu-latest
+    needs: codecov-main
 
     steps:
       - name: 📎 Get LEGO Instructions (Checkout)
