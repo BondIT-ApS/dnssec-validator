@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI commands for DNSSEC Validator database management
+CLI commands for DNSSEC Validator influx db management
 """
 
 import os

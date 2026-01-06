@@ -748,4 +748,4 @@ This project is maintained and developed by [BondIT ApS](https://bondit.dk), a S
 
 ---
 
-**Made with ❤️ by BondIT ApS**
+**Made with ❤️, ☕, and 🧱 by BondIT ApS**
