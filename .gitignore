@@ -110,6 +110,7 @@ dmypy.json
 
 # IDE
 .vscode/
+.hintrc
 .idea/
 *.swp
 *.swo

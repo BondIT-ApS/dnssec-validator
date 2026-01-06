@@ -79,9 +79,9 @@ jobs:
           fi
         fi
         
-        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT  
-        echo "current_month=$(echo "$NEW_VERSION" | cut -d. -f1-2)" >> $GITHUB_OUTPUT
+        echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+        echo "latest_version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"  
+        echo "current_month=$(echo "$NEW_VERSION" | cut -d. -f1-2)" >> "$GITHUB_OUTPUT"
         
         echo "📋 Version Calculation:"
         echo "   Previous: $LATEST_VERSION"
@@ -96,14 +96,14 @@ jobs:
           echo "⚠️ Version tag already exists: $NEW_VERSION"
           if [[ "${{ github.event.inputs.force_version }}" == "$NEW_VERSION" ]]; then
             echo "🔄 Force mode - will overwrite existing tag"
-            echo "should_build=true" >> $GITHUB_OUTPUT
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
           else
             echo "ℹ️ Skipping build for existing version"
-            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
           fi
         else
           echo "✅ New version ready: $NEW_VERSION"
-          echo "should_build=true" >> $GITHUB_OUTPUT
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
         fi
 
   create-tag-and-release:
@@ -200,23 +200,23 @@ jobs:
         NEW_VERSION: ${{ needs.calculate-version.outputs.new_version }}
         SHOULD_BUILD: ${{ needs.calculate-version.outputs.should_build }}
       run: |
-        echo "## 🚀 Version Increment Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Version:** $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
-        echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Tag Created:** $SHOULD_BUILD" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 🚀 Version Increment Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "**Version:** $NEW_VERSION" >> "$GITHUB_STEP_SUMMARY"
+        echo "**Trigger:** ${{ github.event_name }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "**Tag Created:** $SHOULD_BUILD" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
         
         if [[ "$SHOULD_BUILD" == "true" ]]; then
-          echo "### ✅ Actions Completed" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏷️ Created git tag: \`$NEW_VERSION\`" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 Created GitHub release" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Actions Completed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🏷️ Created git tag: \`$NEW_VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 📦 Created GitHub release" >> "$GITHUB_STEP_SUMMARY"
           
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔄 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker publish workflow will automatically build and push Docker image" >> $GITHUB_STEP_SUMMARY
-          echo "- Image will be tagged as: \`${NEW_VERSION}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 🔄 Next Steps" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Docker publish workflow will automatically build and push Docker image" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image will be tagged as: \`${NEW_VERSION}\`, \`latest\`" >> "$GITHUB_STEP_SUMMARY"
         else
-          echo "### ℹ️ No Action Required" >> $GITHUB_STEP_SUMMARY
-          echo "Version \`$NEW_VERSION\` already exists or no changes detected." >> $GITHUB_STEP_SUMMARY
+          echo "### ℹ️ No Action Required" >> "$GITHUB_STEP_SUMMARY"
+          echo "Version \`$NEW_VERSION\` already exists or no changes detected." >> "$GITHUB_STEP_SUMMARY"
         fi
