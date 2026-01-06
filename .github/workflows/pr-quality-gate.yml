@@ -169,7 +169,8 @@ jobs:
       - name: Lint GitHub Actions workflows
         run: |
           echo "🔧 Linting GitHub Actions workflows with actionlint..."
-          actionlint -verbose .github/workflows/*
+          # Ignore SC2129 (style suggestions about using { cmd; } >> file)
+          SHELLCHECK_OPTS="-e SC2129" actionlint -verbose .github/workflows/*
           echo "✅ All workflows passed linting!"
 
       - name: Post workflow linting results
