@@ -3,6 +3,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=github&label=release)](https://github.com/BondIT-ApS/dnssec-validator/releases/latest)
 [![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BondIT-ApS/dnssec-validator/docker-publish.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/BondIT-ApS/dnssec-validator/actions)
+[![codecov](https://img.shields.io/codecov/c/github/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=codecov)](https://codecov.io/gh/BondIT-ApS/dnssec-validator)
 [![Quality Gate](https://img.shields.io/badge/Quality%20Gate-10.0%2F10-brightgreen?style=for-the-badge&logo=python)](https://github.com/BondIT-ApS/dnssec-validator/actions)
 [![GitHub Issues](https://img.shields.io/github/issues/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/issues)
 [![GitHub Stars](https://img.shields.io/github/stars/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/stargazers)
