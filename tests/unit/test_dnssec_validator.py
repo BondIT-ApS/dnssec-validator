@@ -420,7 +420,9 @@ class TestDNSSECAlgorithmSupport:
         mock_resolver_class.return_value = mock_resolver
 
         # Create mock responses for RSA/SHA-256 (algorithm 8)
-        dnskey_rrset = create_mock_dnskey_rrset("rsa-example.com", flags=257, algorithm=8)
+        dnskey_rrset = create_mock_dnskey_rrset(
+            "rsa-example.com", flags=257, algorithm=8
+        )
         ds_rrset = create_mock_ds_rrset("rsa-example.com", key_tag=11111, algorithm=8)
 
         def resolve_side_effect(zone, record_type):
@@ -451,8 +453,12 @@ class TestDNSSECAlgorithmSupport:
         mock_resolver_class.return_value = mock_resolver
 
         # Create mock responses for ECDSA P-256 (algorithm 13)
-        dnskey_rrset = create_mock_dnskey_rrset("ecdsa-example.com", flags=257, algorithm=13)
-        ds_rrset = create_mock_ds_rrset("ecdsa-example.com", key_tag=22222, algorithm=13)
+        dnskey_rrset = create_mock_dnskey_rrset(
+            "ecdsa-example.com", flags=257, algorithm=13
+        )
+        ds_rrset = create_mock_ds_rrset(
+            "ecdsa-example.com", key_tag=22222, algorithm=13
+        )
 
         def resolve_side_effect(zone, record_type):
             mock_answer = MagicMock()
@@ -482,8 +488,12 @@ class TestDNSSECAlgorithmSupport:
         mock_resolver_class.return_value = mock_resolver
 
         # Create mock responses for Ed25519 (algorithm 15)
-        dnskey_rrset = create_mock_dnskey_rrset("eddsa-example.com", flags=257, algorithm=15)
-        ds_rrset = create_mock_ds_rrset("eddsa-example.com", key_tag=33333, algorithm=15)
+        dnskey_rrset = create_mock_dnskey_rrset(
+            "eddsa-example.com", flags=257, algorithm=15
+        )
+        ds_rrset = create_mock_ds_rrset(
+            "eddsa-example.com", key_tag=33333, algorithm=15
+        )
 
         def resolve_side_effect(zone, record_type):
             mock_answer = MagicMock()
@@ -518,7 +528,9 @@ class TestDNSSECExpiredSignatures:
         mock_resolver_class.return_value = mock_resolver
 
         # Create mock responses
-        dnskey_rrset = create_mock_dnskey_rrset("expired.example", flags=257, algorithm=13)
+        dnskey_rrset = create_mock_dnskey_rrset(
+            "expired.example", flags=257, algorithm=13
+        )
         ds_rrset = create_mock_ds_rrset("expired.example", key_tag=44444, algorithm=13)
 
         # Create expired RRSIG (expiration in the past)
@@ -529,7 +541,7 @@ class TestDNSSECExpiredSignatures:
             key_tag=44444,
             algorithm=13,
             expiration=expired_time,
-            inception=inception_time
+            inception=inception_time,
         )
 
         def resolve_side_effect(zone, record_type):
@@ -567,7 +579,9 @@ class TestDNSSECExpiredSignatures:
         mock_resolver_class.return_value = mock_resolver
 
         # Create mock responses
-        dnskey_rrset = create_mock_dnskey_rrset("future.example", flags=257, algorithm=13)
+        dnskey_rrset = create_mock_dnskey_rrset(
+            "future.example", flags=257, algorithm=13
+        )
         ds_rrset = create_mock_ds_rrset("future.example", key_tag=55555, algorithm=13)
 
         # Create RRSIG with future inception time
@@ -579,7 +593,7 @@ class TestDNSSECExpiredSignatures:
             key_tag=55555,
             algorithm=13,
             expiration=expiration_time,
-            inception=inception_time
+            inception=inception_time,
         )
 
         def resolve_side_effect(zone, record_type):

@@ -31,6 +31,9 @@ services:
       # Feature flags
       - SHOW_VALIDATION_TLSA_DANE=false       # Enable TLSA/DANE validation display in webapp
       - SHOW_BONDIT_ATTRIBUTION=true          # Show BondIT attribution footer (default: true)
+      # Google Analytics configuration
+      - GA_ENABLED=false                      # Enable Google Analytics tracking (default: false)
+      - GA_TRACKING_ID=G-XXXXXXXXXX           # Google Analytics 4 tracking ID (required if GA_ENABLED=true)
       # Logging configuration
       - LOG_LEVEL=DEBUG                       # Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
       - LOG_FORMAT=standard                   # Format: 'standard' or 'json' for structured logging

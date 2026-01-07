@@ -22,6 +22,7 @@ A **professional-grade** web-based DNSSEC validation tool that validates the com
 - ✅ **Health Monitoring** - Built-in health checks for orchestration
 - ✅ **Rate Limiting** - Configurable limits for production use
 - ✅ **Analytics** - Optional InfluxDB integration for request logging
+- ✅ **Google Analytics** - Optional GA4 tracking with GDPR-compliant cookie consent
 
 ## 🌐 Live Demo
 
@@ -102,10 +103,35 @@ RATE_LIMIT_API_MINUTE=200
 # Health checks
 HEALTH_CHECK_ENABLED=true
 
-# Analytics (optional)
+# InfluxDB analytics (optional)
 REQUEST_LOGGING_ENABLED=true
 INFLUX_URL=http://influxdb:8086
+
+# Google Analytics (optional, disabled by default)
+GA_ENABLED=false
+GA_TRACKING_ID=G-XXXXXXXXXX
 ```
+
+### Google Analytics Configuration
+
+Optional Google Analytics 4 tracking with GDPR-compliant cookie consent:
+
+```bash
+# Enable Google Analytics
+GA_ENABLED=true
+GA_TRACKING_ID=G-XXXXXXXXXX  # Your GA4 tracking ID
+```
+
+**Features:**
+- ✅ GDPR-compliant cookie consent banner
+- ✅ Only loads GA after user accepts tracking
+- ✅ User can decline tracking
+- ✅ Consent preference saved in local storage
+- ✅ Privacy-first approach with IP anonymization
+- ✅ Disabled by default
+- ✅ Automatically logs error if enabled without tracking ID
+
+**Note:** GA is disabled by default. The application will log an error if `GA_ENABLED=true` but `GA_TRACKING_ID` is missing.
 
 📚 **See [Configuration Reference](documentation/configuration.md) for all options**
 

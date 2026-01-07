@@ -53,11 +53,15 @@ def create_mock_ds_rrset(domain, key_tag=12345, algorithm=8, digest_type=2):
 
 
 def create_mock_rrsig_rrset(
-    domain, covered_type=dns.rdatatype.DNSKEY, algorithm=8, key_tag=12345,
-    expiration=2147483647, inception=0
+    domain,
+    covered_type=dns.rdatatype.DNSKEY,
+    algorithm=8,
+    key_tag=12345,
+    expiration=2147483647,
+    inception=0,
 ):
     """Create a mock RRSIG RRset.
-    
+
     Args:
         domain: Domain name
         covered_type: DNS record type covered by this signature
