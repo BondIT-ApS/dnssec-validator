@@ -27,6 +27,10 @@
         // Feature flags
         window.SHOW_TLSA_DANE = {{ 'true' if show_tlsa_dane else 'false' }};
         
+        // Google Analytics configuration
+        window.GA_ENABLED = {{ 'true' if ga_enabled else 'false' }};
+        window.GA_TRACKING_ID = '{{ ga_tracking_id }}';
+        
         // Auto-validate if domain is pre-filled
         {% if domain %}
         window.addEventListener('DOMContentLoaded', function() {
@@ -34,6 +38,10 @@
         });
         {% endif %}
     </script>
+    <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+    {% if ga_enabled %}
+    <script src="{{ url_for('static', filename='js/cookie-consent.js') }}"></script>
+    {% endif %}
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     
     {% if show_attribution %}

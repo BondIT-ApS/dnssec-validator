@@ -42,8 +42,10 @@ Talisman(
     strict_transport_security=True,
     content_security_policy={
         "default-src": "'self'",
-        "script-src": "'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "script-src": "'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com https://www.google-analytics.com",
         "style-src": "'self' 'unsafe-inline'",
+        "connect-src": "'self' https://www.google-analytics.com https://analytics.google.com",
+        "img-src": "'self' data: https://www.google-analytics.com",
     },
 )
 
@@ -175,10 +177,38 @@ def show_attribution():
     return attribution in ["true", "1", "yes"]  # Support true, 1, yes for flexibility
 
 
+# Google Analytics configuration
+def get_analytics_config():
+    """Get Google Analytics configuration with validation"""
+    ga_enabled = os.getenv("GA_ENABLED", "false").lower() in ["true", "1", "yes"]
+    ga_tracking_id = os.getenv("GA_TRACKING_ID", "")
+
+    # Validate configuration
+    if ga_enabled and not ga_tracking_id:
+        logger.error(
+            "GA_ENABLED is set to true but GA_TRACKING_ID is missing. "
+            "Google Analytics will be disabled. Please set GA_TRACKING_ID environment variable."
+        )
+        ga_enabled = False
+
+    if ga_enabled:
+        logger.debug(f"Google Analytics enabled with tracking ID: {ga_tracking_id}")
+    else:
+        logger.debug("Google Analytics disabled")
+
+    return {"ga_enabled": ga_enabled, "ga_tracking_id": ga_tracking_id}
+
+
 @app.context_processor
 def inject_attribution():
     """Make attribution setting available to all templates"""
     return {"show_attribution": show_attribution()}
+
+
+@app.context_processor
+def inject_analytics():
+    """Make analytics configuration available to all templates"""
+    return get_analytics_config()
 
 
 # Request logging functionality
