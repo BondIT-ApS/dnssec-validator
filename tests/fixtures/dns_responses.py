@@ -53,9 +53,19 @@ def create_mock_ds_rrset(domain, key_tag=12345, algorithm=8, digest_type=2):
 
 
 def create_mock_rrsig_rrset(
-    domain, covered_type=dns.rdatatype.DNSKEY, algorithm=8, key_tag=12345
+    domain, covered_type=dns.rdatatype.DNSKEY, algorithm=8, key_tag=12345,
+    expiration=2147483647, inception=0
 ):
-    """Create a mock RRSIG RRset."""
+    """Create a mock RRSIG RRset.
+    
+    Args:
+        domain: Domain name
+        covered_type: DNS record type covered by this signature
+        algorithm: DNSSEC algorithm number
+        key_tag: Key tag of the signing key
+        expiration: Signature expiration timestamp (default: far future)
+        inception: Signature inception timestamp (default: 0)
+    """
     rrset = MagicMock()
     rrset.name = dns.name.from_text(domain)
     rrset.rdtype = dns.rdatatype.RRSIG
@@ -68,8 +78,8 @@ def create_mock_rrsig_rrset(
     rrsig.algorithm = algorithm
     rrsig.labels = 2
     rrsig.original_ttl = 3600
-    rrsig.expiration = 2147483647
-    rrsig.inception = 0
+    rrsig.expiration = expiration
+    rrsig.inception = inception
     rrsig.key_tag = key_tag
     rrsig.signer = dns.name.from_text(domain)
     rrsig.signature = b"test_signature"
