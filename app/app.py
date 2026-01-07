@@ -764,6 +764,10 @@ class AnalyticsTimeSeries(Resource):
                 window = "5m"
             elif period == "24h":
                 window = "15m"
+            elif period == "7d":
+                window = "1d"  # Daily aggregation for 7 days
+            elif period == "30d":
+                window = "1d"  # Daily aggregation for 30 days
             else:
                 window = "1h"
 

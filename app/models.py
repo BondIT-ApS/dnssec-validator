@@ -329,9 +329,18 @@ class InfluxDBLogger:
 
             results = self._execute_query(flux_query)
             series = []
+            # For day-based windows (7d, 30d), format as date-only
+            use_date_only = window_every == "1d" or (hours and hours >= 168)  # 7+ days
+
             for r in results:
                 if r.get("_time"):
-                    ts = r.get("_time").isoformat()
+                    time_obj = r.get("_time")
+                    if use_date_only:
+                        # Return date only in YYYY-MM-DD format
+                        ts = time_obj.strftime("%Y-%m-%d")
+                    else:
+                        # Return full ISO timestamp for hourly/shorter periods
+                        ts = time_obj.isoformat()
                     value = int(r.get("_value", 0))
                     series.append((ts, value))
             # Sort by timestamp

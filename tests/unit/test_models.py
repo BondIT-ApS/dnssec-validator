@@ -329,3 +329,101 @@ class TestRequestLogCompatibility:
 
         assert result == 42
         mock_logger.cleanup_old_logs.assert_called_once_with(90)
+
+
+@pytest.mark.unit
+class TestInfluxDBLoggerHourlyRequests:
+    """Test InfluxDBLogger hourly requests with date formatting."""
+
+    @patch("models.InfluxDBClient")
+    def test_get_hourly_requests_with_iso_timestamp(self, mock_influx_client_class):
+        """Test hourly requests returns ISO timestamps for short periods."""
+        from models import InfluxDBLogger
+        from datetime import datetime
+
+        mock_client = MagicMock()
+        mock_query_api = MagicMock()
+
+        # Mock query results with datetime objects
+        mock_record1 = Mock()
+        mock_time1 = datetime(2026, 1, 7, 10, 0, 0)
+        mock_record1.values = {"_time": mock_time1, "_value": 10}
+        mock_record2 = Mock()
+        mock_time2 = datetime(2026, 1, 7, 11, 0, 0)
+        mock_record2.values = {"_time": mock_time2, "_value": 15}
+
+        mock_table = Mock()
+        mock_table.records = [mock_record1, mock_record2]
+        mock_query_api.query.return_value = [mock_table]
+
+        mock_client.query_api.return_value = mock_query_api
+        mock_health = Mock(status="pass")
+        mock_client.health.return_value = mock_health
+        mock_influx_client_class.return_value = mock_client
+
+        logger = InfluxDBLogger()
+        # Test with 24 hours (should return ISO timestamps)
+        result = logger.get_hourly_requests(hours=24, window_every="1h")
+
+        assert len(result) == 2
+        # Should return ISO format timestamps for hourly data
+        assert result[0][0] == mock_time1.isoformat()
+        assert result[0][1] == 10
+        assert result[1][0] == mock_time2.isoformat()
+        assert result[1][1] == 15
+
+    @patch("models.InfluxDBClient")
+    def test_get_hourly_requests_with_date_only(self, mock_influx_client_class):
+        """Test hourly requests returns date-only for 7d+ periods."""
+        from models import InfluxDBLogger
+        from datetime import datetime
+
+        mock_client = MagicMock()
+        mock_query_api = MagicMock()
+
+        # Mock query results with datetime objects
+        mock_record1 = Mock()
+        mock_time1 = datetime(2026, 1, 1, 0, 0, 0)
+        mock_record1.values = {"_time": mock_time1, "_value": 100}
+        mock_record2 = Mock()
+        mock_time2 = datetime(2026, 1, 2, 0, 0, 0)
+        mock_record2.values = {"_time": mock_time2, "_value": 150}
+
+        mock_table = Mock()
+        mock_table.records = [mock_record1, mock_record2]
+        mock_query_api.query.return_value = [mock_table]
+
+        mock_client.query_api.return_value = mock_query_api
+        mock_health = Mock(status="pass")
+        mock_client.health.return_value = mock_health
+        mock_influx_client_class.return_value = mock_client
+
+        logger = InfluxDBLogger()
+        # Test with 168 hours (7 days) and daily window (should return date-only)
+        result = logger.get_hourly_requests(hours=168, window_every="1d")
+
+        assert len(result) == 2
+        # Should return YYYY-MM-DD format for daily data
+        assert result[0][0] == "2026-01-01"
+        assert result[0][1] == 100
+        assert result[1][0] == "2026-01-02"
+        assert result[1][1] == 150
+
+    @patch("models.influx_logger")
+    def test_get_external_hourly_requests(self, mock_logger):
+        """Test RequestLog.get_external_hourly_requests calls influx_logger."""
+        from models import RequestLog
+
+        mock_logger.get_hourly_requests.return_value = [
+            ("2026-01-01", 100),
+            ("2026-01-02", 150),
+        ]
+
+        result = RequestLog.get_external_hourly_requests(hours=168, window_every="1d")
+
+        assert len(result) == 2
+        assert result[0] == ("2026-01-01", 100)
+        assert result[1] == ("2026-01-02", 150)
+        mock_logger.get_hourly_requests.assert_called_once_with(
+            168, include_internal=False, window_every="1d", source="api"
+        )
