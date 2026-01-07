@@ -94,7 +94,7 @@
     {
       "label": "Security: Safety CLI Scan",
       "type": "shell",
-      "command": "safety scan --detailed-output",
+      "command": "SAFETY_STAGE=production safety scan --detailed-output",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
