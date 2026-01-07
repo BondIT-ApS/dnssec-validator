@@ -36,6 +36,7 @@ services:
       - FLASK_ENV=production
       # Feature flags
       - SHOW_VALIDATION_TLSA_DANE=false      # Enable TLSA/DANE validation display in webapp
+      - SHOW_BONDIT_ATTRIBUTION=true         # Show BondIT attribution footer (default: true)
       # Logging configuration
       - LOG_LEVEL=INFO                        # Production log level (INFO recommended)
       - LOG_FORMAT=json                       # JSON structured logging for production
