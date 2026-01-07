@@ -109,7 +109,6 @@ venv.bak/
 dmypy.json
 
 # IDE
-.vscode/
 .hintrc
 .idea/
 *.swp
