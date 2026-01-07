@@ -18,23 +18,30 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Download coverage report from last PR
-        uses: dawidd6/action-download-artifact@v6
-        continue-on-error: true
         with:
-          workflow: pr-quality-gate.yml
-          name: coverage-report
-          path: .
-          search_artifacts: true
+          fetch-depth: 0  # Full history for better Codecov analysis
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-mock pytest-flask freezegun requests-mock
+
+      - name: Run tests with coverage
+        run: |
+          python -m pytest tests/ --cov=app --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
-        if: hashFiles('coverage.xml') != ''
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
-          flags: unittests
+          flags: main-branch
           name: dnssec-validator-main-coverage
           fail_ci_if_error: false
           verbose: true
