@@ -1,0 +1,145 @@
+{
+  // ========================================
+  // Python/Flask Configuration
+  // ========================================
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.extraPaths": ["${workspaceFolder}/app"],
+
+  // Black Formatter
+  "black-formatter.args": ["--line-length=88"],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "never"
+    }
+  },
+
+  // Pylint
+  "pylint.enabled": true,
+  "pylint.args": ["--rcfile=${workspaceFolder}/.pylintrc"],
+
+  // ========================================
+  // Testing Configuration
+  // ========================================
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "tests",
+    "-v",
+    "--tb=short",
+    "-o",
+    "addopts="
+  ],
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+
+  // ========================================
+  // Editor Settings
+  // ========================================
+  "editor.formatOnSave": true,
+  "editor.rulers": [88, 120],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "[json]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[yaml]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "[html]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[css]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[xml]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "redhat.vscode-xml"
+  },
+
+  // ========================================
+  // File Exclusions
+  // ========================================
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/htmlcov": true,
+    "**/.coverage": true,
+    "**/.venv": true,
+    "**/venv": true,
+    "**/.DS_Store": true,
+    "**/data/uploads": true,
+    "**/data/*.db": true
+  },
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.venv": true,
+    "**/venv": true,
+    "**/htmlcov": true,
+    "**/.pytest_cache": true,
+    "**/data": true
+  },
+
+  // ========================================
+  // GitHub Actions
+  // ========================================
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml"
+  },
+
+  // ========================================
+  // Docker
+  // ========================================
+  "docker.showStartPage": false,
+
+  // ========================================
+  // Git
+  // ========================================
+  "git.ignoreLimitWarning": true,
+  "git.autofetch": true,
+
+  // ========================================
+  // Terminal
+  // ========================================
+  "terminal.integrated.env.osx": {
+    "FLASK_ENV": "development",
+    "PYTHONPATH": "${workspaceFolder}/app"
+  },
+  "terminal.integrated.env.linux": {
+    "FLASK_ENV": "development",
+    "PYTHONPATH": "${workspaceFolder}/app"
+  },
+
+  // ========================================
+  // Spell Checker
+  // ========================================
+  "cSpell.words": [
+    "DNSSEC",
+    "DNSKEY",
+    "RRSIG",
+    "TLSA",
+    "DANE",
+    "dnspython",
+    "influxdb",
+    "bondit",
+    "pytest",
+    "pylint",
+    "bandit",
+    "codecov"
+  ]
+}
