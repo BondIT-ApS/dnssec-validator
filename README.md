@@ -1,18 +1,19 @@
 # DNSSEC Validator
 
-[![GitHub Release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=github&label=release)](https://github.com/BondIT-ApS/dnssec-validator/releases/latest)
-[![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/BondIT-ApS/dnssec-validator/docker-publish.yml?branch=main&style=for-the-badge&logo=github)](https://github.com/BondIT-ApS/dnssec-validator/actions)
-[![codecov](https://img.shields.io/codecov/c/github/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=codecov)](https://codecov.io/gh/BondIT-ApS/dnssec-validator)
-[![Quality Gate](https://img.shields.io/badge/Quality%20Gate-10.0%2F10-brightgreen?style=for-the-badge&logo=python)](https://github.com/BondIT-ApS/dnssec-validator/actions)
-[![GitHub Issues](https://img.shields.io/github/issues/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/issues)
-[![GitHub Stars](https://img.shields.io/github/stars/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/stargazers)
 [![License](https://img.shields.io/github/license/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator/blob/main/LICENSE)
-[![Security Rating](https://img.shields.io/badge/security-A%2B-green?style=for-the-badge&logo=shield)](https://github.com/BondIT-ApS/dnssec-validator/security)
+[![GitHub repo size](https://img.shields.io/github/repo-size/BondIT-ApS/dnssec-validator?style=for-the-badge)](https://github.com/BondIT-ApS/dnssec-validator)
+[![Made in Denmark](https://img.shields.io/badge/Made%20in-Denmark-red?style=for-the-badge)](https://bondit.dk)
+[![codecov](https://img.shields.io/codecov/c/github/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=codecov)](https://codecov.io/gh/BondIT-ApS/dnssec-validator)
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/maboni82/dnssec-validator?style=for-the-badge&logo=docker)](https://hub.docker.com/r/maboni82/dnssec-validator)
+[![GitHub Release](https://img.shields.io/github/v/release/BondIT-ApS/dnssec-validator?style=for-the-badge&logo=github&label=release)](https://github.com/BondIT-ApS/dnssec-validator/releases/latest)
+
+> 🧱 **Building DNS Security Solutions, One Brick at a Time** 🔒
 
 A **professional-grade** web-based DNSSEC validation tool that validates the complete chain of trust from root servers down to your domain. Similar to Verisign's DNSSEC Debugger but with modern architecture, Docker support, and comprehensive monitoring.
 
-## ✨ Features
+## 🧱 Foundation Pieces (Features)
 
 - ✅ **Complete Chain of Trust** - Validates from root (.) → TLD → domain
 - ✅ **Visual Web Interface** - Clean UI with color-coded validation status
@@ -28,7 +29,7 @@ A **professional-grade** web-based DNSSEC validation tool that validates the com
 
 **Try it now: [https://dnssec-validator.bondit.dk](https://dnssec-validator.bondit.dk)**
 
-## 🚀 Quick Start
+## 🚀 Quick Assembly (Quick Start)
 
 ```bash
 # Run with Docker
@@ -58,7 +59,7 @@ curl http://localhost:8080/api/validate/bondit.dk
 # Response includes chain of trust and DNSSEC records
 ```
 
-## 📦 Installation Options
+## 📦 Assembly Instructions (Installation)
 
 ### Docker (Recommended)
 
@@ -155,7 +156,7 @@ Comprehensive documentation is available in the [`documentation/`](documentation
 - **[Development Guide](documentation/development.md)** - Contributing and development setup
 - **[Database & Analytics](documentation/database-analytics.md)** - InfluxDB integration
 
-## 🏗️ Architecture
+## 🏗️ Building Design (Architecture)
 
 DNSSEC Validator validates the complete chain of trust:
 
@@ -196,7 +197,7 @@ All deployments include health check endpoints:
 
 📚 **See [Container Orchestration Guide](documentation/container-orchestration.md) for complete examples**
 
-## 🤝 Contributing
+## 🤝 Join the Building Team (Contributing)
 
 We welcome contributions! To contribute:
 
@@ -224,7 +225,7 @@ DNSSEC Validator uses semantic versioning with `YY.M.PATCH` format:
 
 View all releases on the [Releases page](https://github.com/BondIT-ApS/dnssec-validator/releases).
 
-## 📋 Roadmap
+## 📋 Building Blueprints (Roadmap)
 
 - [ ] [CAA record validation](https://github.com/BondIT-ApS/dnssec-validator/issues/35)
 - [x] [TLSA/DANE validation](https://github.com/BondIT-ApS/dnssec-validator/issues/34) ✅
