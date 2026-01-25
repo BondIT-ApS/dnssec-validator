@@ -51,10 +51,37 @@ jobs:
     name: 🐳 Build DNSSEC Validator Docker Image
     runs-on: ubuntu-latest
     needs: codecov-main
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: 📎 Get LEGO Instructions (Checkout)
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 🏷️ Generate Semantic Version Tag
+        id: version
+        run: |
+          # Generate YY.M format from current date
+          YEAR_MONTH=$(date +'%y.%-m')
+
+          # Use GitHub run number as patch version for simplicity
+          # This ensures each build gets an incrementing patch number
+          PATCH_VERSION="${{ github.run_number }}"
+
+          # Create semantic version: YY.M.PATCH
+          VERSION="${YEAR_MONTH}.${PATCH_VERSION}"
+          YEAR_MONTH_TAG="${YEAR_MONTH}"
+
+          # Set outputs and environment variables
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_ENV"
+          echo "year_month=${YEAR_MONTH_TAG}" >> "$GITHUB_ENV"
+
+          echo "🏷️ Building semantic version: ${VERSION}"
+          echo "📅 Year/Month tag: ${YEAR_MONTH_TAG}"
+          echo "🔢 Run number: ${PATCH_VERSION}"
 
       - name: 🌍 Set up Multi-Platform Builder (QEMU)
         uses: docker/setup-qemu-action@v3
@@ -68,28 +95,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: 🏷️ Generate Semantic Version Tag
-        id: version
-        run: |
-          # Generate YY.M format from current date
-          YEAR_MONTH=$(date +'%y.%-m')
-          
-          # Use GitHub run number as patch version for simplicity
-          # This ensures each build gets an incrementing patch number
-          PATCH_VERSION="${{ github.run_number }}"
-          
-          # Create semantic version: YY.M.PATCH
-          VERSION="${YEAR_MONTH}.${PATCH_VERSION}"
-          YEAR_MONTH_TAG="${YEAR_MONTH}"
-          
-          # Set environment variables for use in subsequent steps
-          echo "version=${VERSION}" >> "$GITHUB_ENV"
-          echo "year_month=${YEAR_MONTH_TAG}" >> "$GITHUB_ENV"
-          
-          echo "🏷️ Building semantic version: ${VERSION}"
-          echo "📅 Year/Month tag: ${YEAR_MONTH_TAG}"
-          echo "🔢 Run number: ${PATCH_VERSION}"
 
       - name: 🏢 Build & Push DNSSEC Validator Docker Image
         uses: docker/build-push-action@v6
@@ -107,3 +112,90 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: mode=max
           sbom: true
+
+  # 📦 Create GitHub Release
+  create-release:
+    name: 📦 Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: production-build
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📎 Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 📝 Generate Release Notes
+        id: release_notes
+        run: |
+          VERSION="${{ needs.production-build.outputs.version }}"
+
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          # Generate changelog
+          if [ -n "$PREVIOUS_TAG" ]; then
+            CHANGELOG=$(git log "${PREVIOUS_TAG}..HEAD" --pretty=format:"- %s" --no-merges | head -20)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges | head -20)
+          fi
+
+          # Create release body
+          cat > release_notes.md << EOF
+          ## 🧱 DNSSEC Validator ${VERSION}
+
+          **Release Date:** $(date +'%Y-%m-%d')
+
+          ### 📦 Docker Images
+
+          \`\`\`bash
+          docker pull maboni82/dnssec-validator:${VERSION}
+          docker pull maboni82/dnssec-validator:latest
+          \`\`\`
+
+          ### 🔄 Changes
+
+          ${CHANGELOG}
+
+          ### 📚 Documentation
+
+          - [Installation Guide](https://github.com/BondIT-ApS/dnssec-validator/blob/main/documentation/installation.md)
+          - [Configuration Reference](https://github.com/BondIT-ApS/dnssec-validator/blob/main/documentation/configuration.md)
+          - [API Documentation](https://github.com/BondIT-ApS/dnssec-validator/blob/main/documentation/api-reference.md)
+
+          ---
+
+          **Built with ❤️, ☕, and 🧱 by BondIT ApS**
+          EOF
+
+          echo "Release notes generated for version ${VERSION}"
+
+      - name: 🏷️ Create Git Tag
+        run: |
+          VERSION="${{ needs.production-build.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin "${VERSION}"
+
+      - name: 📦 Create GitHub Release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const version = '${{ needs.production-build.outputs.version }}';
+            const releaseNotes = fs.readFileSync('release_notes.md', 'utf8');
+
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: version,
+              name: `Release ${version}`,
+              body: releaseNotes,
+              draft: false,
+              prerelease: false
+            });
+
+            console.log(`✅ Release ${version} created successfully!`);
