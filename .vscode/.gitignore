@@ -1,0 +1,10 @@
+# Ignore personal settings
+settings.json
+launch.json
+
+# Keep shared configuration
+!tasks.json
+!extensions.json
+!*.template
+!README.md
+!.gitignore
