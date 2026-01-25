@@ -127,7 +127,7 @@ Thumbs.db
 
 # Safety checks
 .safety-policy.yml
-.safety-project.ini
+#.safety-project.ini
 
 # AI Agent configuration (could contain project-specific credentials)
 WARP.md
