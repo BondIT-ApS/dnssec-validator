@@ -1,0 +1,178 @@
+name: 🐛 Bug Report
+description: Found a loose LEGO brick? Report a bug to help us improve
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thanks for helping us build better! 🧱
+
+        We appreciate you taking the time to report a bug. This helps us maintain a solid foundation.
+
+        **Before submitting:**
+        - Search existing issues to avoid duplicates
+        - Update to the latest version to see if the bug is already fixed
+        - Check our [documentation](https://github.com/BondIT-ApS/dnssec-validator/tree/main/documentation) for known issues
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Tell us what went wrong
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Help us understand how to recreate the issue
+      placeholder: |
+        1. Go to '...'
+        2. Enter domain '...'
+        3. Click on '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: The validation should succeed and show...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Instead, I got an error...
+    validations:
+      required: true
+
+  - type: input
+    id: domain
+    attributes:
+      label: Test Domain
+      description: What domain were you testing? (if applicable)
+      placeholder: example.com
+    validations:
+      required: false
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: What version of DNSSEC Validator are you using?
+      options:
+        - latest (Docker)
+        - 26.1.x
+        - main branch (development)
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method
+      description: How are you running DNSSEC Validator?
+      options:
+        - Docker (docker run)
+        - Docker Compose
+        - Kubernetes
+        - Docker Swarm
+        - Direct Python execution
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      description: Where did you encounter the bug?
+      options:
+        - Web UI
+        - REST API
+        - CLI
+        - Health Check Endpoint
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Tell us about your environment
+      placeholder: |
+        - OS: [e.g., Ubuntu 22.04, macOS 14, Windows 11]
+        - Browser: [e.g., Chrome 120, Firefox 121] (if Web UI)
+        - Python version: [e.g., 3.13] (if running directly)
+        - Docker version: [e.g., 24.0.7] (if using Docker)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Please paste any relevant log output
+      placeholder: |
+        Paste logs here...
+
+        For Docker: docker-compose logs dnssec-validator
+        For direct Python: Check console output
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem
+      placeholder: Drag and drop images here
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem
+      placeholder: This started happening after upgrading to...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched for similar issues and found none
+          required: true
+        - label: I am using the latest version (or have specified my version)
+          required: true
+        - label: I have provided all required information above
+          required: true
+        - label: I have checked the documentation for this issue
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        **Thank you for contributing to DNSSEC Validator!** 🧱✨
+
+        We'll review your bug report and get back to you as soon as possible. Your report helps us build better DNS security tools!
+
+        *Building better DNS security, one LEGO brick at a time.*
