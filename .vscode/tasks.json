@@ -207,6 +207,7 @@
         "🧪 Run Tests with Coverage",
         "🛡️ Security: Bandit Scan",
         "🔒 Security: Safety CLI Scan",
+        "🔧 Lint GitHub Actions Workflows",
         "🐳 Docker: Build and Run",
         "🩺 Docker: Health Check"
       ],
