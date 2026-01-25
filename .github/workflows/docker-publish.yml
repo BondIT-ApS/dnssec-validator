@@ -105,7 +105,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          attestations: |
-            type=provenance,mode=max
-            type=sbom
+          provenance: mode=max
           sbom: true

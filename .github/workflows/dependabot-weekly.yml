@@ -40,26 +40,31 @@ jobs:
             console.log('PR List:', prList);
 
             // Create weekly maintenance issue
-            const issueBody = `## 🧱 Weekly LEGO Maintenance Report - DNSSEC Validator
+            const currentDate = new Date().toISOString().split('T')[0];
+            const nextCheckDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-**Date:** ${new Date().toISOString().split('T')[0]}
-**Dependency Status:** ${dependabotPRs.length} pending update(s)
-
-### 📦 Pending Dependency Updates:
-${prList}
-
-### 🔒 Security Status:
-See security audit job results for details.
-
----
-*Automated weekly maintenance check for keeping our DNS security LEGO pieces up to date!* 🧱🔒
-
-**Next Check:** ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}`;
+            const issueBody = [
+              '## 🧱 Weekly LEGO Maintenance Report - DNSSEC Validator',
+              '',
+              `Date: ${currentDate}`,
+              `Dependency Status: ${dependabotPRs.length} pending update(s)`,
+              '',
+              '### 📦 Pending Dependency Updates:',
+              prList,
+              '',
+              '### 🔒 Security Status:',
+              'See security audit job results for details.',
+              '',
+              '---',
+              '*Automated weekly maintenance check for keeping our DNS security LEGO pieces up to date!* 🧱🔒',
+              '',
+              `Next Check: ${nextCheckDate}`
+            ].join('\n');
 
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🧱 Weekly Maintenance Report - ${new Date().toISOString().split('T')[0]}`,
+              title: `🧱 Weekly Maintenance Report - ${currentDate}`,
               body: issueBody,
               labels: ['maintenance', 'dependencies']
             });
