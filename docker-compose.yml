@@ -4,14 +4,8 @@ services:
     container_name: dnssec-influxdb
     ports:
       - "8086:8086"
-    environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
-      - DOCKER_INFLUXDB_INIT_ORG=dnssec-validator
-      - DOCKER_INFLUXDB_INIT_BUCKET=requests
-      - DOCKER_INFLUXDB_INIT_RETENTION=10d
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+    env_file:
+      - .env
     volumes:
       - influx_data:/var/lib/influxdb2
     restart: unless-stopped
@@ -26,42 +20,8 @@ services:
     build: .
     ports:
       - "8080:8080"
-    environment:
-      - FLASK_ENV=development
-      # Feature flags
-      - SHOW_VALIDATION_TLSA_DANE=false       # Enable TLSA/DANE validation display in webapp
-      - SHOW_BONDIT_ATTRIBUTION=true          # Show BondIT attribution footer (default: true)
-      # Google Analytics configuration
-      - GA_ENABLED=false                      # Enable Google Analytics tracking (default: false)
-      - GA_TRACKING_ID=G-XXXXXXXXXX           # Google Analytics 4 tracking ID (required if GA_ENABLED=true)
-      # Logging configuration
-      - LOG_LEVEL=DEBUG                       # Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
-      - LOG_FORMAT=standard                   # Format: 'standard' or 'json' for structured logging
-      # - LOG_FILE=/app/logs/dnssec-validator.log  # Optional: Enable file logging (uncomment to use)
-      # Rate limiting configuration
-      - RATE_LIMIT_GLOBAL_DAY=5000   # Global requests per IP per day
-      - RATE_LIMIT_GLOBAL_HOUR=1000  # Global requests per IP per hour
-      - RATE_LIMIT_API_MINUTE=200    # API requests per IP per minute
-      - RATE_LIMIT_API_HOUR=2000     # API requests per IP per hour
-      - RATE_LIMIT_WEB_MINUTE=50     # Web interface requests per IP per minute
-      - RATE_LIMIT_WEB_HOUR=500      # Web interface requests per IP per hour
-      # CORS configuration for production
-      # - CORS_ORIGINS=https://dnssec-validator.bondit.dk,https://yourdomain.com
-      # Health check configuration
-      - HEALTH_CHECK_ENABLED=true
-      - HEALTH_CHECK_DNS_TEST=true
-      - HEALTH_CHECK_MEMORY_THRESHOLD=90
-      # InfluxDB logging configuration
-      - REQUEST_LOGGING_ENABLED=true
-      - INFLUX_URL=http://influxdb:8086
-      - INFLUX_TOKEN=my-super-secret-auth-token
-      - INFLUX_ORG=dnssec-validator
-      - INFLUX_BUCKET=requests
-      # Database management (use these for database operations)
-      - INFLUX_DB_RECREATE=false          # Set to 'true' to recreate database/bucket on startup
-      - INFLUX_DB_VERSION=v2.1            # Optional schema version for tracking
-      - INFLUX_DB_TRUNCATE=false          # Set to 'true' to truncate all data (DANGEROUS!)
-      - INFLUX_DB_INIT_WAIT=10            # Seconds to wait for InfluxDB readiness (default: 5)
+    env_file:
+      - .env
     volumes:
       - ./app:/app
     depends_on:

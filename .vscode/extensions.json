@@ -1,0 +1,63 @@
+{
+  "recommendations": [
+    // Core Python Development
+    "ms-python.python",
+    "ms-python.black-formatter",
+    "ms-python.pylint",
+    "ms-python.debugpy",
+
+    // Testing
+    "littlefoxteam.vscode-python-test-adapter",
+
+    // Flask Development
+    "wholroyd.jinja",
+
+    // Web Development
+    "ecmel.vscode-html-css",
+    "esbenp.prettier-vscode",
+
+    // DevOps & Containers
+    "ms-azuretools.vscode-docker",
+    "redhat.vscode-yaml",
+    "github.vscode-github-actions",
+
+    // Version Control
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+    "github.vscode-pull-request-github",
+
+    // Code Quality & Productivity
+    "streetsidesoftware.code-spell-checker",
+    "christian-kohler.path-intellisense",
+    "formulahendry.auto-close-tag",
+    "formulahendry.auto-rename-tag",
+    "Gruntfuggly.todo-tree",
+    "wayou.vscode-todo-highlight",
+
+    // Security & Testing
+    "snyk-security.vscode-vuln-cost",
+    "humao.rest-client",
+
+    // File Support
+    "redhat.vscode-xml",
+    "yzhang.markdown-all-in-one",
+    "dotjoshjohnson.xml",
+
+    // Environment
+    "mikestead.dotenv"
+  ],
+  "unwanted": [
+    // Conflicting formatters
+    "ms-python.autopep8",
+    "ms-python.isort",
+
+    // Redundant test explorers
+    "hbenl.vscode-test-explorer",
+
+    // Unnecessary for Flask backend
+    "ms-vscode.vscode-typescript-tslint-plugin",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
+    "dsznajder.es7-react-js-snippets"
+  ]
+}

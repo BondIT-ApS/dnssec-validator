@@ -331,11 +331,46 @@ jobs:
             echo "🧱 LEGO Quality Gate: Test coverage looks good!"
           fi
 
+  # 🔒 CodeQL Security Analysis (parallel)
+  codeql-analysis:
+    name: 🔒 LEGO CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    needs: discover-changes
+    if: needs.discover-changes.outputs.app-changed == 'true'
+
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
+
+      - name: CodeQL Analysis Complete
+        run: echo "🔒 CodeQL security analysis completed for DNSSEC Validator!"
+
   # 🐳 DNSSEC Validator Build Test
   build-test-app:
     name: 🐳 LEGO DNSSEC Validator Assembly Test (Docker Build)
     runs-on: ubuntu-latest
-    needs: [discover-changes, lint-app, lint-workflows, quality-app, safety-security-check, codecov-upload]
+    needs: [discover-changes, lint-app, lint-workflows, quality-app, safety-security-check, codecov-upload, codeql-analysis]
     if: always() && !contains(needs.*.result, 'failure') && needs.discover-changes.outputs.app-changed == 'true'
 
     steps:
@@ -359,7 +394,7 @@ jobs:
   quality-gate-summary:
     name: 📊 LEGO Quality Gate Summary
     runs-on: ubuntu-latest
-    needs: [discover-changes, lint-app, lint-workflows, quality-app, safety-security-check, codecov-upload, build-test-app]
+    needs: [discover-changes, lint-app, lint-workflows, quality-app, safety-security-check, codecov-upload, codeql-analysis, build-test-app]
     if: always()
 
     steps:
@@ -369,21 +404,22 @@ jobs:
           script: |
             const needs = ${{ toJson(needs) }};
             const linesChanged = needs['discover-changes'].outputs['lines-changed'];
-            
+
             // Determine overall status
             let allPassed = true;
             let results = [];
-            
+
             // Check each job result
             Object.entries(needs).forEach(([job, result]) => {
               if (job === 'discover-changes') return;
-              
+
               const jobNames = {
                 'lint-app': '🐍 DNSSEC Validator Linting',
                 'lint-workflows': '🔧 Workflow Linting',
                 'quality-app': '✨ DNSSEC Validator Quality',
                 'safety-security-check': '🛡️ Safety Security Scan',
                 'codecov-upload': '📊 Code Coverage Report',
+                'codeql-analysis': '🔒 CodeQL Security Analysis',
                 'build-test-app': '🐳 DNSSEC Validator Docker Build'
               };
               

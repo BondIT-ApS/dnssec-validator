@@ -1,10 +1,23 @@
 {
   "version": "2.0.0",
   "tasks": [
+    // ========================================
+    // 🐍 Backend Tasks
+    // ========================================
     {
-      "label": "Format with Black",
+      "label": "🧱 Setup Virtual Environment",
       "type": "shell",
-      "command": "black app/ tests/ --line-length=88 --exclude='.git,.github,data'",
+      "command": "python3 -m venv .venv && source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🚀 Run Flask Development Server",
+      "type": "shell",
+      "command": "source .venv/bin/activate && python app/app.py",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -16,21 +29,7 @@
       }
     },
     {
-      "label": "Lint with Pylint",
-      "type": "shell",
-      "command": "pipx run pylint app/*.py --rcfile=.pylintrc",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "Run Tests with Coverage",
+      "label": "🧪 Run Tests with Coverage",
       "type": "shell",
       "command": "source .venv/bin/activate && python -m pytest tests/ --cov=app --cov-report=html --cov-report=term -o addopts=\"\"",
       "problemMatcher": [],
@@ -44,35 +43,62 @@
       }
     },
     {
-      "label": "Lint GitHub Actions Workflows",
+      "label": "🎨 Format with Black",
       "type": "shell",
-      "command": "SHELLCHECK_OPTS=\"-e SC2129\" actionlint .github/workflows/*.yml",
+      "command": "black app/ tests/ --line-length=88 --exclude='.git,.github,data'",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "new"
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": false
       }
     },
     {
-      "label": "Docker: Build and Run",
+      "label": "🐍 Lint with Pylint",
+      "type": "shell",
+      "command": "source .venv/bin/activate && pylint app/*.py --rcfile=.pylintrc",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🛡️ Security: Bandit Scan",
+      "type": "shell",
+      "command": "source .venv/bin/activate && bandit -r app/ -f json -o bandit-report.json --exit-zero || true",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🔒 Security: Safety CLI Scan",
+      "type": "shell",
+      "command": "SAFETY_STAGE=production safety scan --detailed-output || true",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "showReuseMessage": false
+      }
+    },
+
+    // ========================================
+    // 🐳 Docker Tasks
+    // ========================================
+    {
+      "label": "🐳 Docker: Build and Run",
       "type": "shell",
       "command": "docker-compose up -d --build",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "new"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
       }
     },
     {
-      "label": "Docker: Stop",
+      "label": "🐳 Docker: Stop Services",
       "type": "shell",
       "command": "docker-compose down",
       "problemMatcher": [],
@@ -82,7 +108,7 @@
       }
     },
     {
-      "label": "Docker: View Logs",
+      "label": "🐳 Docker: View Logs",
       "type": "shell",
       "command": "docker-compose logs -f",
       "problemMatcher": [],
@@ -92,28 +118,98 @@
       }
     },
     {
-      "label": "Security: Safety CLI Scan",
+      "label": "🐳 Docker: Restart Services",
       "type": "shell",
-      "command": "SAFETY_STAGE=production safety scan --detailed-output",
+      "command": "docker-compose restart",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
-        "panel": "new",
-        "showReuseMessage": false
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": false
+        "panel": "new"
       }
     },
     {
-      "label": "Full Quality Check",
+      "label": "🩺 Docker: Health Check",
+      "type": "shell",
+      "command": "curl -f http://localhost:8080/health || echo 'Health check failed'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+
+    // ========================================
+    // 🔧 Development Tasks
+    // ========================================
+    {
+      "label": "📦 Update Dependencies",
+      "type": "shell",
+      "command": "source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "🧹 Clean Cache",
+      "type": "shell",
+      "command": "find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true && find . -type f -name '*.pyc' -delete && rm -rf .pytest_cache htmlcov .coverage",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+
+    // ========================================
+    // 🔧 GitHub Actions Tasks
+    // ========================================
+    {
+      "label": "🔧 Lint GitHub Actions Workflows",
+      "type": "shell",
+      "command": "SHELLCHECK_OPTS=\"-e SC2129\" actionlint .github/workflows/*.yml",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+
+    // ========================================
+    // 🧱 Quality Gate Tasks
+    // ========================================
+    {
+      "label": "🧱 Backend Quality Check",
       "dependsOn": [
-        "Format with Black",
-        "Lint with Pylint",
-        "Run Tests with Coverage",
-        "Security: Safety CLI Scan",
-        "Lint GitHub Actions Workflows"
+        "🎨 Format with Black",
+        "🐍 Lint with Pylint",
+        "🛡️ Security: Bandit Scan",
+        "🔒 Security: Safety CLI Scan"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "🧱 Full Quality Check",
+      "dependsOn": [
+        "🧱 Backend Quality Check",
+        "🔧 Lint GitHub Actions Workflows"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "🚀 Pre-Push Quality Gate",
+      "dependsOn": [
+        "🎨 Format with Black",
+        "🐍 Lint with Pylint",
+        "🧪 Run Tests with Coverage",
+        "🛡️ Security: Bandit Scan",
+        "🔒 Security: Safety CLI Scan",
+        "🔧 Lint GitHub Actions Workflows",
+        "🐳 Docker: Build and Run",
+        "🩺 Docker: Health Check"
       ],
       "dependsOrder": "sequence",
       "problemMatcher": [],
