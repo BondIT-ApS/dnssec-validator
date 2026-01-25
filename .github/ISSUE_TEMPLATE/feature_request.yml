@@ -1,0 +1,197 @@
+name: 💡 Feature Request
+description: Got an idea for a new LEGO brick? Suggest a feature or enhancement
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Let's build something new together! 🧱✨
+
+        We love hearing your ideas for new features and improvements. Every great structure starts with a creative vision!
+
+        **Before submitting:**
+        - Check the [roadmap](https://github.com/BondIT-ApS/dnssec-validator#-building-blueprints-roadmap) to see if it's already planned
+        - Search existing issues to see if someone else suggested it
+        - Review our [documentation](https://github.com/BondIT-ApS/dnssec-validator/tree/main/documentation) to ensure it doesn't already exist
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: A brief, clear description of your feature idea
+      placeholder: Add support for validating CAA records
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What pain point does it address?
+      placeholder: |
+        As a DNS administrator, I need to...
+        Currently, I have to...
+        This is frustrating because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you envision this feature working?
+      placeholder: |
+        The validator should:
+        1. Check for CAA records
+        2. Validate their syntax
+        3. Display results in the web UI
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you thought about other ways to solve this problem?
+      placeholder: |
+        Alternative 1: Use an external tool...
+        Alternative 2: Manual checking...
+        But these don't work because...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the application would this feature affect?
+      options:
+        - Web UI
+        - REST API
+        - CLI
+        - Core Validation Logic
+        - Documentation
+        - Docker/Deployment
+        - Analytics/Monitoring
+        - Multiple Components
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority (from your perspective)
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would be helpful
+        - High - Blocking my use case
+        - Critical - Essential for adoption
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: Benefits
+      description: Who would benefit from this feature and how?
+      placeholder: |
+        - DNS administrators could validate CAA records without external tools
+        - Security teams could check CAA compliance
+        - Reduces need for multiple validation tools
+    validations:
+      required: false
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or References
+      description: Are there examples of this feature in other tools or specifications?
+      placeholder: |
+        - Similar implementation: https://...
+        - RFC specification: https://...
+        - Related standard: https://...
+    validations:
+      required: false
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups or Diagrams
+      description: If you have visual ideas, share them here
+      placeholder: Drag and drop images or describe the UI/workflow
+    validations:
+      required: false
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Breaking Change?
+      description: Would this feature require breaking changes to the API or configuration?
+      options:
+        - No - Fully backward compatible
+        - Maybe - Might need minor changes
+        - Yes - Would require breaking changes
+        - Unsure
+    validations:
+      required: false
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Notes
+      description: Any technical details or considerations for implementation?
+      placeholder: |
+        - Requires dnspython version X.Y
+        - May need new dependency on...
+        - Performance considerations...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to help implement this feature?
+      options:
+        - label: I would like to implement this feature
+        - label: I can help with testing
+        - label: I can help with documentation
+        - label: I can provide feedback during development
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Anything else we should know about this feature?
+      placeholder: This would be particularly useful for...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched for similar feature requests and found none
+          required: true
+        - label: I have checked the roadmap and this isn't already planned
+          required: true
+        - label: I have provided a clear problem statement and proposed solution
+          required: true
+        - label: I have reviewed the documentation to ensure this doesn't exist
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        **Thank you for sharing your ideas!** 🧱💡
+
+        We review all feature requests and prioritize based on community needs, implementation complexity, and alignment with our roadmap. Your input helps shape the future of DNSSEC Validator!
+
+        *Building better DNS security, one LEGO brick at a time.*
