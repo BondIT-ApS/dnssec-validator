@@ -66,9 +66,22 @@ jobs:
           # Generate YY.M format from current date
           YEAR_MONTH=$(date +'%y.%-m')
 
-          # Use GitHub run number as patch version for simplicity
-          # This ensures each build gets an incrementing patch number
-          PATCH_VERSION="${{ github.run_number }}"
+          # Find the highest patch version for the current month
+          # Get all tags matching the current month pattern
+          EXISTING_TAGS=$(git tag -l "${YEAR_MONTH}.*" | sort -V)
+
+          if [ -z "$EXISTING_TAGS" ]; then
+            # No tags for this month yet, start at 1
+            PATCH_VERSION=1
+            echo "📦 No existing tags for ${YEAR_MONTH}, starting at patch version 1"
+          else
+            # Extract the highest patch number and increment
+            HIGHEST_TAG=$(echo "$EXISTING_TAGS" | tail -1)
+            HIGHEST_PATCH=$(echo "$HIGHEST_TAG" | cut -d'.' -f3)
+            PATCH_VERSION=$((HIGHEST_PATCH + 1))
+            echo "📦 Found existing tags for ${YEAR_MONTH}, highest: ${HIGHEST_TAG}"
+            echo "📦 Incrementing to patch version: ${PATCH_VERSION}"
+          fi
 
           # Create semantic version: YY.M.PATCH
           VERSION="${YEAR_MONTH}.${PATCH_VERSION}"
@@ -81,7 +94,7 @@ jobs:
 
           echo "🏷️ Building semantic version: ${VERSION}"
           echo "📅 Year/Month tag: ${YEAR_MONTH_TAG}"
-          echo "🔢 Run number: ${PATCH_VERSION}"
+          echo "🔢 Patch version: ${PATCH_VERSION}"
 
       - name: 🌍 Set up Multi-Platform Builder (QEMU)
         uses: docker/setup-qemu-action@v3
