@@ -94,17 +94,30 @@ python app/app.py
 
 ## 🔧 Configuration
 
-Configure via environment variables:
+Configuration is managed via environment variables in the `.env` file:
 
 ```bash
-# Rate limiting
+# 1. Copy the template
+cp .env.template .env
+
+# 2. Edit .env with your values
+nano .env
+```
+
+**Key Configuration Options:**
+
+```bash
+# Flask Environment
+FLASK_ENV=development  # or production
+
+# Rate Limiting
 RATE_LIMIT_GLOBAL_DAY=5000
 RATE_LIMIT_API_MINUTE=200
 
-# Health checks
+# Health Checks
 HEALTH_CHECK_ENABLED=true
 
-# InfluxDB analytics (optional)
+# InfluxDB Analytics (optional)
 REQUEST_LOGGING_ENABLED=true
 INFLUX_URL=http://influxdb:8086
 
@@ -112,6 +125,8 @@ INFLUX_URL=http://influxdb:8086
 GA_ENABLED=false
 GA_TRACKING_ID=G-XXXXXXXXXX
 ```
+
+See `.env.template` for all available configuration options and detailed documentation.
 
 ### Google Analytics Configuration
 
@@ -175,8 +190,12 @@ Each step is cryptographically verified using DNSSEC signatures.
 ### Docker Compose
 
 ```bash
-# Production deployment with compose
-docker-compose -f docker-compose.prod.yml up -d
+# 1. Configure environment
+cp .env.template .env
+nano .env  # Update with production values
+
+# 2. Deploy with compose
+docker-compose up -d
 ```
 
 ### Container Orchestration

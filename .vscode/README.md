@@ -80,14 +80,17 @@ After copying `launch.json.template` to `launch.json`, these debug configuration
 
 ### Initial Setup
 ```bash
-# 1. Create virtual environment
+# 1. Copy environment configuration
+cp .env.template .env
+
+# 2. Create virtual environment
 Task: 🧱 Setup Virtual Environment
 
-# 2. Copy configuration templates
+# 3. Copy VSCode configuration templates
 cp .vscode/settings.json.template .vscode/settings.json
 cp .vscode/launch.json.template .vscode/launch.json
 
-# 3. Install recommended extensions
+# 4. Install recommended extensions
 (VSCode will prompt automatically)
 ```
 
