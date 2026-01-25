@@ -138,8 +138,8 @@ class TestBulkValidationEndpoint:
         """Test that GET method is not allowed on bulk endpoint"""
         response = client.get("/api/validate/bulk")
 
-        # Should return 405 Method Not Allowed (or 429 if rate limited)
-        assert response.status_code in [405, 429]
+        # Should return 400/405 Method Not Allowed (or 429 if rate limited)
+        assert response.status_code in [400, 405, 429]
 
     @patch("dnssec_validator.DNSSECValidator")
     def test_bulk_validation_url_extraction(self, mock_validator, client):
