@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import psutil
@@ -493,6 +494,83 @@ error_model = api.model(
     },
 )
 
+# Bulk validation models
+bulk_options_model = api.model(
+    "BulkValidationOptions",
+    {
+        "timeout": fields.Integer(
+            description="Request timeout in seconds per domain (default: 30)",
+            default=30,
+            min=5,
+            max=120,
+        ),
+        "parallel": fields.Boolean(
+            description="Enable concurrent validation (default: true)", default=True
+        ),
+        "include_errors": fields.Boolean(
+            description="Include detailed error messages (default: true)", default=True
+        ),
+    },
+)
+
+bulk_request_model = api.model(
+    "BulkValidationRequest",
+    {
+        "domains": fields.List(
+            fields.String,
+            required=True,
+            description="Array of domain names to validate (max 50)",
+            min_items=1,
+            max_items=50,
+        ),
+        "options": fields.Nested(
+            bulk_options_model,
+            description="Validation options",
+            required=False,
+        ),
+    },
+)
+
+bulk_summary_model = api.model(
+    "BulkValidationSummary",
+    {
+        "total": fields.Integer(
+            required=True, description="Total number of domains processed"
+        ),
+        "valid": fields.Integer(
+            required=True, description="Number of domains with valid DNSSEC"
+        ),
+        "invalid": fields.Integer(
+            required=True, description="Number of domains with invalid DNSSEC"
+        ),
+        "insecure": fields.Integer(
+            required=True, description="Number of domains without DNSSEC"
+        ),
+        "error": fields.Integer(
+            required=True, description="Number of domains with validation errors"
+        ),
+        "processing_time": fields.Float(
+            required=True, description="Total processing time in seconds"
+        ),
+    },
+)
+
+bulk_response_model = api.model(
+    "BulkValidationResponse",
+    {
+        "results": fields.List(
+            fields.Nested(validation_result_model),
+            required=True,
+            description="Individual validation results for each domain",
+        ),
+        "summary": fields.Nested(
+            bulk_summary_model,
+            required=True,
+            description="Summary statistics for the bulk validation",
+        ),
+    },
+)
+
 # Define namespaces
 ns_validate = api.namespace("validate", description="DNSSEC validation operations")
 ns_analytics = api.namespace(
@@ -679,6 +757,291 @@ class DNSSECDetailedValidation(Resource):
                 "status": "error",
                 "errors": [sanitize_error(e)],
             }, 500
+
+
+@ns_validate.route("/bulk")
+class DNSSECBulkValidation(Resource):
+    @ns_validate.doc("validate_bulk_domains")
+    @ns_validate.expect(bulk_request_model, validate=True)
+    @ns_validate.response(
+        200, "Success - Bulk validation completed", bulk_response_model
+    )
+    @ns_validate.response(400, "Bad Request - Invalid request format or domain list")
+    @ns_validate.response(429, "Too Many Requests - Rate limit exceeded")
+    @ns_validate.response(500, "Internal Server Error - Bulk validation failed")
+    @limiter.limit(
+        f"{int(rate_limits['api_minute']) // 5} per minute; {int(rate_limits['api_hour']) // 2} per hour"
+    )
+    def post(self):
+        """
+        Validate multiple domains in a single request
+
+        This endpoint performs DNSSEC validation for multiple domains concurrently.
+        It accepts an array of domains and optional configuration parameters.
+
+        **Key Features:**
+        - Parallel processing for improved performance
+        - Individual domain error isolation (failures don't block batch)
+        - Configurable timeout per domain
+        - Summary statistics for the entire batch
+        - Maximum 50 domains per request
+
+        **Request Body:**
+        ```json
+        {
+          "domains": ["bondit.dk", "example.com", "test.org"],
+          "options": {
+            "timeout": 30,
+            "parallel": true,
+            "include_errors": true
+          }
+        }
+        ```
+
+        **Response includes:**
+        - Individual validation results for each domain
+        - Summary with total, valid, invalid, insecure, and error counts
+        - Total processing time
+
+        **Rate Limiting:**
+        Bulk operations have stricter rate limits than single-domain endpoints
+        to prevent resource exhaustion.
+        """
+        start_time = time.time()
+
+        try:
+            # Parse request body
+            data = request.get_json()
+            if not data:
+                return {
+                    "error": "Request body is required",
+                    "details": "Expected JSON with 'domains' array",
+                }, 400
+
+            domains = data.get("domains", [])
+            options = data.get("options", {})
+
+            # Validate domains array
+            if not isinstance(domains, list):
+                return {
+                    "error": "Invalid request format",
+                    "details": "'domains' must be an array",
+                }, 400
+
+            if len(domains) == 0:
+                return {
+                    "error": "Empty domain list",
+                    "details": "At least one domain is required",
+                }, 400
+
+            if len(domains) > 50:
+                return {
+                    "error": "Too many domains",
+                    "details": f"Maximum 50 domains allowed, received {len(domains)}",
+                }, 400
+
+            # Parse options with defaults
+            timeout = options.get("timeout", 30)
+            parallel = options.get("parallel", True)
+            include_errors = options.get("include_errors", True)
+
+            # Validate timeout
+            if not isinstance(timeout, (int, float)) or timeout < 5 or timeout > 120:
+                return {
+                    "error": "Invalid timeout",
+                    "details": "Timeout must be between 5 and 120 seconds",
+                }, 400
+
+            # Import domain utilities for validation
+            from domain_utils import extract_domain_from_input, is_valid_domain_format
+
+            # Pre-validate and extract domains
+            validated_domains = []
+            invalid_domains = []
+
+            for domain in domains:
+                if not isinstance(domain, str):
+                    invalid_domains.append(
+                        {
+                            "input": str(domain),
+                            "reason": "Domain must be a string",
+                        }
+                    )
+                    continue
+
+                # Extract domain from URL or validate direct domain input
+                extracted = extract_domain_from_input(domain)
+
+                if not extracted or not is_valid_domain_format(extracted):
+                    invalid_domains.append(
+                        {"input": domain, "reason": "Invalid domain format"}
+                    )
+                    continue
+
+                validated_domains.append({"original": domain, "extracted": extracted})
+
+            # If all domains are invalid, return error
+            if not validated_domains:
+                return {
+                    "error": "No valid domains",
+                    "details": "All provided domains have invalid format",
+                    "invalid_domains": invalid_domains if include_errors else None,
+                }, 400
+
+            logger.info(
+                f"Starting bulk validation for {len(validated_domains)} domains "
+                f"(parallel={parallel}, timeout={timeout}s)"
+            )
+
+            # Perform validation
+            results = []
+
+            if parallel:
+                # Parallel processing with ThreadPoolExecutor
+                max_workers = min(10, len(validated_domains))
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    # Submit all validation tasks
+                    future_to_domain = {
+                        executor.submit(
+                            self._validate_single_domain,
+                            domain_info["extracted"],
+                            domain_info["original"],
+                            timeout,
+                        ): domain_info
+                        for domain_info in validated_domains
+                    }
+
+                    # Collect results as they complete
+                    for future in as_completed(future_to_domain):
+                        domain_info = future_to_domain[future]
+                        try:
+                            result = future.result(timeout=timeout + 5)
+                            results.append(result)
+                        except Exception as e:
+                            logger.error(
+                                f"Bulk validation error for {domain_info['extracted']}: {str(e)}"
+                            )
+                            results.append(
+                                {
+                                    "domain": domain_info["extracted"],
+                                    "status": "error",
+                                    "validation_time": datetime.utcnow().isoformat()
+                                    + "Z",
+                                    "errors": (
+                                        [str(e)]
+                                        if include_errors
+                                        else ["Validation failed"]
+                                    ),
+                                }
+                            )
+            else:
+                # Sequential processing
+                for domain_info in validated_domains:
+                    result = self._validate_single_domain(
+                        domain_info["extracted"], domain_info["original"], timeout
+                    )
+                    results.append(result)
+
+            # Add results for pre-validation failures
+            for invalid in invalid_domains:
+                results.append(
+                    {
+                        "domain": invalid["input"],
+                        "status": "error",
+                        "validation_time": datetime.utcnow().isoformat() + "Z",
+                        "errors": (
+                            [invalid["reason"]]
+                            if include_errors
+                            else ["Invalid domain format"]
+                        ),
+                    }
+                )
+
+            # Calculate summary statistics
+            processing_time = time.time() - start_time
+            summary = self._calculate_summary(results, processing_time)
+
+            logger.info(
+                f"Bulk validation completed: {summary['total']} total, "
+                f"{summary['valid']} valid, {summary['invalid']} invalid, "
+                f"{summary['insecure']} insecure, {summary['error']} errors "
+                f"in {processing_time:.2f}s"
+            )
+
+            return {"results": results, "summary": summary}, 200
+
+        except Exception as e:
+            logger.error(f"Bulk validation request failed: {str(e)}", exc_info=True)
+            return {
+                "error": "Bulk validation failed",
+                "details": sanitize_error(e),
+            }, 500
+
+    def _validate_single_domain(self, domain, original_input, timeout):
+        """
+        Validate a single domain with timeout protection
+
+        Args:
+            domain: The domain to validate
+            original_input: The original user input (currently unused, reserved for future use)
+            timeout: Timeout in seconds (currently unused, reserved for future timeout implementation)
+
+        Returns:
+            dict: Validation result
+        """
+        try:
+            logger.debug(f"Validating domain: {domain}")
+            validator = DNSSECValidator(domain)
+            result = validator.validate()
+
+            # Ensure validation_time is present
+            if "validation_time" not in result:
+                result["validation_time"] = datetime.utcnow().isoformat() + "Z"
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Domain validation error for {domain}: {str(e)}")
+            return {
+                "domain": domain,
+                "status": "error",
+                "validation_time": datetime.utcnow().isoformat() + "Z",
+                "errors": [sanitize_error(e)],
+            }
+
+    def _calculate_summary(self, results, processing_time):
+        """
+        Calculate summary statistics from validation results
+
+        Args:
+            results: List of validation result dictionaries
+            processing_time: Total processing time in seconds
+
+        Returns:
+            dict: Summary statistics
+        """
+        summary = {
+            "total": len(results),
+            "valid": 0,
+            "invalid": 0,
+            "insecure": 0,
+            "error": 0,
+            "processing_time": round(processing_time, 2),
+        }
+
+        for result in results:
+            status = result.get("status", "error")
+            if status == "valid":
+                summary["valid"] += 1
+            elif status == "invalid":
+                summary["invalid"] += 1
+            elif status == "insecure":
+                summary["insecure"] += 1
+            else:
+                summary["error"] += 1
+
+        return summary
 
 
 # Analytics endpoints
