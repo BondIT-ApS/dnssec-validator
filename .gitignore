@@ -1,3 +1,7 @@
+# DNSSEC-Validator - .gitignore
+# BondIT-ApS standard .gitignore with Python, Docker, macOS, and IDE support
+# Like building a LEGO set - we only track the pieces that matter! 🧱
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -118,5 +122,15 @@ dmypy.json
 .DS_Store
 Thumbs.db
 
-# Warp AI development documentation (local only)
+# Bandit reports
+*bandit-report.json
+
+# Safety checks
+.safety-policy.yml
+.safety-project.ini
+
+# AI Agent configuration (could contain project-specific credentials)
 WARP.md
+CLAUDE.md
+.claude/
+CURSOR.md
