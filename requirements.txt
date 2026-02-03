@@ -1,7 +1,7 @@
 Flask==3.1.2
 dnspython==2.8.0
 cryptography>=46.0.3
-gunicorn==24.1.1
+gunicorn==25.0.1
 flask-cors>=6.0.2
 flask-limiter==4.1.1
 requests==2.32.5
