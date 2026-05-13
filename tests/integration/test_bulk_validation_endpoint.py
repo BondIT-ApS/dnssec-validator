@@ -125,9 +125,7 @@ class TestBulkValidationEndpoint:
         """Test bulk validation with invalid timeout value"""
         response = client.post(
             "/api/validate/bulk",
-            data=json.dumps(
-                {"domains": ["bondit.dk"], "options": {"timeout": 200}}
-            ),
+            data=json.dumps({"domains": ["bondit.dk"], "options": {"timeout": 200}}),
             content_type="application/json",
         )
 
@@ -155,7 +153,9 @@ class TestBulkValidationEndpoint:
 
         response = client.post(
             "/api/validate/bulk",
-            data=json.dumps({"domains": ["https://bondit.dk", "http://bondit.dk/path"]}),
+            data=json.dumps(
+                {"domains": ["https://bondit.dk", "http://bondit.dk/path"]}
+            ),
             content_type="application/json",
         )
 
