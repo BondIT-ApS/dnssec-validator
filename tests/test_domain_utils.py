@@ -13,6 +13,10 @@ from domain_utils import (
     is_valid_domain_format,
     extract_root_domain,
     has_subdomain,
+    to_ascii,
+    to_unicode,
+    normalize_idn_domain,
+    IDNConversionError,
 )
 
 
@@ -152,6 +156,113 @@ class TestHealthCheck:
         assert hasattr(domain_utils, "extract_domain_from_input")
         assert hasattr(domain_utils, "normalize_domain_input")
         assert hasattr(domain_utils, "is_valid_domain_format")
+        assert hasattr(domain_utils, "to_ascii")
+        assert hasattr(domain_utils, "to_unicode")
+        assert hasattr(domain_utils, "normalize_idn_domain")
         assert callable(domain_utils.extract_domain_from_input)
         assert callable(domain_utils.normalize_domain_input)
         assert callable(domain_utils.is_valid_domain_format)
+
+
+class TestIDNConversion:
+    """Tests for internationalized domain name (IDN) handling."""
+
+    # Sample IDN domains covering several scripts called out in the issue.
+    # Rather than hardcoding the punycode form (which depends on the precise
+    # `idna` library version and is easy to get wrong by hand), we compute
+    # the expected A-label dynamically using the same library the production
+    # code uses, then assert round-trip and shape properties.
+    UNICODE_DOMAINS = [
+        "ドメイン.テスト",  # Japanese
+        "домен.тест",  # Cyrillic
+        "αλφαβητο.δοκιμή",  # Greek
+        "العربية.اختبار",  # Arabic
+    ]
+
+    @staticmethod
+    def _expected_ascii(unicode_domain):
+        """Compute the canonical A-label for a Unicode domain via ``idna``."""
+        import idna  # local import to keep top-of-module imports lean
+
+        return idna.encode(unicode_domain, uts46=True).decode("ascii").lower()
+
+    def test_to_ascii_converts_unicode_to_punycode(self):
+        """Unicode IDN input must produce a valid A-label starting xn--."""
+        for unicode_form in self.UNICODE_DOMAINS:
+            ascii_form = to_ascii(unicode_form)
+            assert ascii_form == self._expected_ascii(unicode_form)
+            # Every label in an IDN should be ACE-prefixed since none of the
+            # test domains have ASCII-only labels.
+            for label in ascii_form.split("."):
+                assert label.startswith("xn--")
+
+    def test_to_ascii_passes_through_ascii_domains(self):
+        """ASCII input should be returned unchanged (lowercased)."""
+        assert to_ascii("example.com") == "example.com"
+        assert to_ascii("Example.COM") == "example.com"
+        # An A-label that's already in punycode form should round-trip.
+        encoded = self._expected_ascii("ドメイン.テスト")
+        assert to_ascii(encoded) == encoded
+
+    def test_to_ascii_rejects_invalid_idn(self):
+        """Garbage Unicode input should raise IDNConversionError."""
+        with pytest.raises(IDNConversionError):
+            to_ascii("")
+        with pytest.raises(IDNConversionError):
+            # Pure emoji is not a valid IDN under UTS-46
+            to_ascii("💩.💩")
+
+    def test_to_unicode_decodes_punycode(self):
+        """A-label input should decode back to its Unicode form."""
+        for unicode_form in self.UNICODE_DOMAINS:
+            ascii_form = self._expected_ascii(unicode_form)
+            assert to_unicode(ascii_form) == unicode_form
+
+    def test_to_unicode_passes_through_plain_ascii(self):
+        """Domains without ACE prefix should remain unchanged."""
+        assert to_unicode("example.com") == "example.com"
+        assert to_unicode("www.bondit.dk") == "www.bondit.dk"
+
+    def test_normalize_idn_domain_returns_both_forms(self):
+        """normalize_idn_domain returns both representations."""
+        for unicode_form in self.UNICODE_DOMAINS:
+            ascii_form = self._expected_ascii(unicode_form)
+            result = normalize_idn_domain(unicode_form)
+            assert result == {"unicode": unicode_form, "ascii": ascii_form}
+
+            # Round-trip from punycode input must yield the same dict
+            assert normalize_idn_domain(ascii_form) == result
+
+    def test_extract_domain_from_unicode_input(self):
+        """extract_domain_from_input should accept Unicode and return A-label."""
+        for unicode_form in self.UNICODE_DOMAINS:
+            assert extract_domain_from_input(unicode_form) == self._expected_ascii(
+                unicode_form
+            )
+
+    def test_extract_domain_from_unicode_url(self):
+        """Unicode hostnames embedded in URLs should be extracted and encoded."""
+        extracted = extract_domain_from_input("https://ドメイン.テスト/path?x=1")
+        assert extracted == self._expected_ascii("ドメイン.テスト")
+
+    def test_normalize_domain_input_with_unicode(self):
+        """normalize_domain_input must accept Unicode input."""
+        domain, input_type = normalize_domain_input("ドメイン.テスト")
+        assert domain == self._expected_ascii("ドメイン.テスト")
+        assert input_type == "domain"
+
+    def test_invalid_idn_returns_none(self):
+        """Invalid IDN input should yield None rather than raising."""
+        assert extract_domain_from_input("💩.💩") is None
+
+    def test_is_valid_domain_format_accepts_punycode(self):
+        """A-labels (xn--...) are valid domain formats."""
+        for unicode_form in self.UNICODE_DOMAINS:
+            ascii_form = self._expected_ascii(unicode_form)
+            assert is_valid_domain_format(ascii_form)
+
+    def test_is_valid_domain_format_rejects_raw_unicode(self):
+        """Raw Unicode (U-label) is *not* a valid format at the regex layer."""
+        # Callers should convert to A-label first via ``to_ascii``.
+        for unicode_form in self.UNICODE_DOMAINS:
+            assert not is_valid_domain_format(unicode_form)

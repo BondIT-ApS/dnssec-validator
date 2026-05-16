@@ -359,6 +359,32 @@ def sanitize_error(error):
     return "An error occurred while processing your request"
 
 
+def attach_idn_forms(result, ascii_domain):
+    """Attach Unicode/ASCII (IDN) forms to a validation result.
+
+    For internationalized domains, exposing both representations helps API
+    consumers display the user-facing Unicode form while keeping the
+    DNS-ready ASCII (punycode) form available.
+
+    Args:
+        result (dict): The validation result dictionary (mutated in place).
+        ascii_domain (str): The A-label (ASCII) domain used for validation.
+
+    Returns:
+        dict: The same ``result`` dict with ``domain_ascii`` and
+            ``domain_unicode`` fields populated.
+    """
+    # Local import to avoid circular imports during module load
+    from domain_utils import to_unicode  # pylint: disable=import-outside-toplevel
+
+    if not isinstance(result, dict):
+        return result
+
+    result["domain_ascii"] = ascii_domain
+    result["domain_unicode"] = to_unicode(ascii_domain)
+    return result
+
+
 # Define API models for documentation
 dnskey_record_model = api.model(
     "DNSKEYRecord",
@@ -469,7 +495,24 @@ validation_result_model = api.model(
     "ValidationResult",
     {
         "domain": fields.String(
-            required=True, description="The domain that was validated"
+            required=True,
+            description=(
+                "The domain that was validated (ASCII / A-label form, "
+                "suitable for DNS queries)"
+            ),
+        ),
+        "domain_unicode": fields.String(
+            description=(
+                "Unicode (U-label) representation of the domain — "
+                "equal to ``domain`` for plain ASCII inputs, decoded "
+                "punycode for internationalized domain names"
+            )
+        ),
+        "domain_ascii": fields.String(
+            description=(
+                "ASCII (A-label / punycode) representation of the domain. "
+                "Always populated; equal to ``domain``."
+            )
         ),
         "status": fields.String(
             required=True,
@@ -625,7 +668,13 @@ timeseries_model = api.model(
 @ns_validate.route("/<path:domain>")
 @ns_validate.param(
     "domain",
-    "The domain name or URL to validate (e.g., bondit.dk or https://bondit.dk)",
+    (
+        "The domain name or URL to validate (e.g., bondit.dk, "
+        "https://bondit.dk). Internationalized domain names (IDN) are "
+        "accepted in either Unicode form (e.g. ドメイン.テスト, "
+        "домен.тест) or their punycode A-label form "
+        "(e.g. xn--eckwd4c7c.xn--zckzah)."
+    ),
 )
 class DNSSECValidation(Resource):
     @ns_validate.doc("validate_domain")
@@ -680,6 +729,7 @@ class DNSSECValidation(Resource):
             logger.debug(f"Starting DNSSEC validation for domain: {domain}")
             validator = DNSSECValidator(domain)
             result = validator.validate()
+            attach_idn_forms(result, domain)
             logger.info(
                 f"DNSSEC validation completed for {domain} with status: {result.get('status', 'unknown')}"
             )
@@ -699,7 +749,12 @@ class DNSSECValidation(Resource):
 @ns_validate.route("/<path:domain>/detailed")
 @ns_validate.param(
     "domain",
-    "The domain name or URL to analyze in detail (e.g., bondit.dk or https://bondit.dk)",
+    (
+        "The domain name or URL to analyze in detail (e.g., bondit.dk, "
+        "https://bondit.dk). Internationalized domain names (IDN) are "
+        "accepted in either Unicode form (e.g. ドメイン.テスト) or "
+        "their punycode A-label form (e.g. xn--eckwd4c7c.xn--zckzah)."
+    ),
 )
 class DNSSECDetailedValidation(Resource):
     @ns_validate.doc("validate_domain_detailed")
@@ -754,6 +809,7 @@ class DNSSECDetailedValidation(Resource):
             logger.debug(f"Starting detailed DNSSEC analysis for domain: {domain}")
             validator = DNSSECValidator(domain)
             result = validator.validate_detailed()
+            attach_idn_forms(result, domain)
             logger.info(
                 f"Detailed DNSSEC analysis completed for {domain} with status: {result.get('status', 'unknown')}"
             )
@@ -1006,6 +1062,7 @@ class DNSSECBulkValidation(Resource):
             logger.debug(f"Validating domain: {domain}")
             validator = DNSSECValidator(domain)
             result = validator.validate()
+            attach_idn_forms(result, domain)
 
             # Ensure validation_time is present
             if "validation_time" not in result:

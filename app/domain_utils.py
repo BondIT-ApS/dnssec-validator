@@ -1,12 +1,126 @@
 """
-Domain utilities for URL parsing and subdomain fallback logic.
+Domain utilities for URL parsing, IDN handling, and subdomain fallback logic.
+
+This module handles both ASCII and internationalized (Unicode) domain names.
+Unicode input (e.g. ``ドメイン.テスト``) is transparently converted to its
+A-label (punycode) form so that downstream DNS queries — which only accept
+ASCII — work correctly. The IDNA 2008 ``idna`` package is used for the
+conversion (the standard library ``idna`` codec only supports IDNA 2003).
 """
 
 import re
 from urllib.parse import urlparse
 import logging
 
+import idna
+
 logger = logging.getLogger(__name__)
+
+# A domain may already be supplied in its punycode (A-label) form. Such labels
+# always begin with the ACE prefix "xn--" (case-insensitive).
+_ACE_PREFIX = "xn--"
+
+
+class IDNConversionError(ValueError):
+    """Raised when an internationalized domain name cannot be encoded/decoded."""
+
+
+def _contains_non_ascii(value):
+    """Return True if *value* contains any non-ASCII character."""
+    if not value:
+        return False
+    try:
+        value.encode("ascii")
+    except UnicodeEncodeError:
+        return True
+    return False
+
+
+def to_ascii(domain):
+    """Convert a (possibly Unicode) domain to its IDNA 2008 A-label form.
+
+    Already-ASCII domains are returned unchanged (lowercased). Punycode-encoded
+    inputs (``xn--*``) are also accepted and returned as-is.
+
+    Args:
+        domain (str): Domain in either Unicode (U-label) or ASCII (A-label)
+            form. May include subdomains.
+
+    Returns:
+        str: ASCII representation suitable for DNS queries.
+
+    Raises:
+        IDNConversionError: If the input cannot be encoded as a valid IDN.
+    """
+    if not domain:
+        raise IDNConversionError("Empty domain")
+
+    domain = domain.strip().rstrip(".")
+    if not domain:
+        raise IDNConversionError("Empty domain")
+
+    # Fast path: pure ASCII input — no conversion needed beyond lowercasing.
+    if not _contains_non_ascii(domain):
+        return domain.lower()
+
+    try:
+        # ``uts46=True`` performs case-folding and basic Unicode normalization
+        # so that e.g. uppercase Cyrillic input round-trips correctly.
+        encoded = idna.encode(domain, uts46=True).decode("ascii")
+    except idna.IDNAError as exc:
+        raise IDNConversionError(
+            f"Invalid internationalized domain '{domain}': {exc}"
+        ) from exc
+    except UnicodeError as exc:
+        raise IDNConversionError(f"Unable to encode domain '{domain}': {exc}") from exc
+
+    return encoded.lower()
+
+
+def to_unicode(domain):
+    """Convert a domain to its Unicode (U-label) representation.
+
+    ASCII domains without any ``xn--`` labels are returned unchanged. Domains
+    containing ACE-prefixed labels are decoded to their Unicode form.
+
+    Args:
+        domain (str): Domain in either Unicode or ASCII form.
+
+    Returns:
+        str: Unicode representation. Falls back to the lowercased input if
+            decoding fails (so callers always get *some* string back).
+    """
+    if not domain:
+        return domain
+
+    domain = domain.strip().rstrip(".").lower()
+
+    # No ACE prefix anywhere and input is already ASCII → nothing to decode.
+    if _ACE_PREFIX not in domain and not _contains_non_ascii(domain):
+        return domain
+
+    try:
+        return idna.decode(domain)
+    except idna.IDNAError as exc:
+        logger.debug("Unable to decode IDN domain '%s': %s", domain, exc)
+        return domain
+
+
+def normalize_idn_domain(domain):
+    """Return both the Unicode and ASCII (punycode) form of a domain.
+
+    Args:
+        domain (str): Domain in either form.
+
+    Returns:
+        dict: ``{"unicode": <U-label>, "ascii": <A-label>}``.
+
+    Raises:
+        IDNConversionError: If the domain cannot be converted.
+    """
+    ascii_form = to_ascii(domain)
+    unicode_form = to_unicode(ascii_form)
+    return {"unicode": unicode_form, "ascii": ascii_form}
 
 
 def extract_domain_from_input(user_input):
@@ -15,56 +129,80 @@ def extract_domain_from_input(user_input):
     - A plain domain: bondit.services
     - A subdomain: argocd.bondit.services
     - A URL: https://argocd.bondit.services/path?query=1
+    - An internationalized domain: ドメイン.テスト or its punycode form
+      xn--eckwd4c7c.xn--zckzah
+
+    Unicode input is converted to its A-label (punycode) form so that the
+    returned domain can be used directly for DNS queries.
 
     Returns:
-        str: The extracted domain name in lowercase
+        str: The extracted domain name in ASCII (A-label) lowercase form,
+            or None if extraction/validation fails.
     """
     if not user_input:
         return None
 
-    # Clean and normalize input
+    # Preserve Unicode characters — only strip whitespace and lowercase
+    # ASCII letters. Calling ``.lower()`` is safe for Unicode too.
     user_input = user_input.strip().replace(" ", "").lower()
+
+    domain = None
 
     # If it looks like a URL, parse it
     if user_input.startswith(("http://", "https://", "ftp://")):
         try:
             parsed = urlparse(user_input)
-            domain = parsed.hostname
-            if domain:
-                return domain
-        except Exception as e:
-            logger.debug(f"Failed to parse URL {user_input}: {e}")
+            if parsed.hostname:
+                domain = parsed.hostname
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug("Failed to parse URL %s: %s", user_input, e)
 
     # If it contains protocol-like patterns but isn't a valid URL, try to extract
-    if "://" in user_input:
+    if domain is None and "://" in user_input:
         try:
-            # Try to extract everything after ://
             parts = user_input.split("://", 1)
             if len(parts) == 2:
                 # Extract domain part before first /
                 domain_part = parts[1].split("/")[0]
                 # Remove port if present
                 domain_part = domain_part.split(":")[0]
-                if domain_part and is_valid_domain_format(domain_part):
-                    return domain_part
-        except Exception as e:
+                if domain_part:
+                    domain = domain_part
+        except Exception as e:  # pylint: disable=broad-except
             logger.debug(
-                f"Failed to extract domain from URL-like input {user_input}: {e}"
+                "Failed to extract domain from URL-like input %s: %s",
+                user_input,
+                e,
             )
 
     # Otherwise, treat as direct domain input
-    # Remove any trailing paths, queries, etc.
-    domain = user_input.split("/")[0].split("?")[0].split("#")[0]
+    if domain is None:
+        # Remove any trailing paths, queries, etc.
+        domain = user_input.split("/")[0].split("?")[0].split("#")[0]
+        # Remove port if present
+        domain = domain.split(":")[0]
 
-    # Remove port if present
-    domain = domain.split(":")[0]
+    if not domain:
+        return None
 
-    return domain if is_valid_domain_format(domain) else None
+    # Convert to ASCII (A-label) form for downstream DNS use. If the input is
+    # invalid as an IDN, return None so callers can produce a clear 400 error.
+    try:
+        ascii_domain = to_ascii(domain)
+    except IDNConversionError as exc:
+        logger.debug("IDN conversion failed for %s: %s", domain, exc)
+        return None
+
+    return ascii_domain if is_valid_domain_format(ascii_domain) else None
 
 
 def is_valid_domain_format(domain):
     """
     Check if a string has a valid domain format.
+
+    Accepts both plain ASCII domains and IDN A-labels (``xn--...``). Pure
+    Unicode (U-label) input is *not* considered valid here — call
+    :func:`to_ascii` first to normalize.
 
     Args:
         domain (str): Domain to validate
@@ -75,12 +213,14 @@ def is_valid_domain_format(domain):
     if not domain:
         return False
 
+    # Reject pure Unicode input — A-labels are required at this layer.
+    if _contains_non_ascii(domain):
+        return False
+
     # Basic domain validation regex
-    # Allows letters, numbers, hyphens, dots
-    # Must end with at least 2-letter TLD
-    domain_pattern = (
-        r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$"
-    )
+    # Allows letters, numbers, hyphens, dots. Punycode labels are accepted
+    # via the general ``[a-z0-9-]`` character class (they start with ``xn--``).
+    domain_pattern = r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z0-9-]{2,}$"
 
     return (
         len(domain) <= 253  # RFC limit
@@ -89,7 +229,7 @@ def is_valid_domain_format(domain):
         and not domain.endswith(
             "."
         )  # Can't end with dot (we'll handle root zones separately)
-        and not ".." in domain  # No consecutive dots
+        and ".." not in domain  # No consecutive dots
         and re.match(domain_pattern, domain) is not None
     )
 
@@ -175,7 +315,8 @@ def normalize_domain_input(user_input):
     This function:
     1. Extracts domain from URLs
     2. Cleans and normalizes the domain
-    3. Validates the format
+    3. Converts internationalized (Unicode) input to its A-label form
+    4. Validates the format
 
     Args:
         user_input (str): Raw user input
@@ -196,7 +337,7 @@ def normalize_domain_input(user_input):
     elif "://" in original_input:
         input_type = "url"  # URL-like but malformed
 
-    # Extract domain
+    # Extract domain (this also performs IDN normalization)
     domain = extract_domain_from_input(original_input)
 
     if not domain or not is_valid_domain_format(domain):
