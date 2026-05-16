@@ -334,7 +334,8 @@ class TestCAAValidateCAA:
         result = validator.validate_caa()
         assert result["caa_status"] == "valid"
         assert result["issuance_allowed"] is True
-        assert "letsencrypt.org" in [ca["ca"] for ca in result["authorized_cas"]]
+        authorized_ca_names = [ca["ca"] for ca in result["authorized_cas"]]
+        assert authorized_ca_names == ["letsencrypt.org"]
 
     @patch.object(CAAValidator, "_query_caa_with_inheritance")
     def test_validate_caa_restricted(self, mock_query):
