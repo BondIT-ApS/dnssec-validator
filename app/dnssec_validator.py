@@ -12,6 +12,7 @@ import dns.query
 import dns.message
 
 from tlsa_validator import TLSAValidator
+from caa_validator import CAAValidator
 from domain_utils import get_fallback_domains, has_subdomain
 
 
@@ -26,6 +27,7 @@ class DNSSECValidator:
             "chain_of_trust": [],
             "records": {"dnskey": [], "ds": [], "rrsig": []},
             "tlsa_summary": None,  # Basic TLSA info for simple validation
+            "caa_summary": None,  # Basic CAA info for simple validation
             "errors": [],
         }
 
@@ -62,6 +64,13 @@ class DNSSECValidator:
         except Exception as e:
             logging.warning(f"TLSA check failed: {e}")
             # Don't fail the overall validation for TLSA issues
+
+        # Add basic CAA check (non-blocking)
+        try:
+            self._add_caa_summary()
+        except Exception as e:
+            logging.warning(f"CAA check failed: {e}")
+            # Don't fail the overall validation for CAA issues
 
         return self.results
 
@@ -429,6 +438,9 @@ class DNSSECValidator:
 
             # Add comprehensive TLSA analysis
             self._add_detailed_tlsa_analysis(detailed_result)
+
+            # Add comprehensive CAA analysis
+            self._add_detailed_caa_analysis(detailed_result)
 
         except Exception as e:
             detailed_result["detailed_analysis"]["errors"] = [
@@ -883,4 +895,99 @@ class DNSSECValidator:
                 "records_found": 0,
                 "dane_status": "error",
                 "message": "⚠️ TLSA check failed",
+            }
+
+    def _add_caa_summary(self):
+        """Add basic CAA summary to simple validation results"""
+        try:
+            caa_validator = CAAValidator(self.domain)
+            caa_result = caa_validator.validate_caa(timeout=5)
+
+            summary = {
+                "status": caa_result["caa_status"],
+                "records_found": len(caa_result["caa_records"]),
+                "authorized_cas": [
+                    ca["ca"] for ca in caa_result.get("authorized_cas", [])
+                ],
+                "wildcard_authorized_cas": [
+                    ca["ca"] for ca in caa_result.get("wildcard_authorized_cas", [])
+                ],
+                "iodef_targets": [
+                    t["target"] for t in caa_result.get("iodef_targets", [])
+                ],
+                "inherited": caa_result.get("inherited", False),
+                "checked_domain": caa_result.get("checked_domain"),
+                "issuance_allowed": caa_result.get("issuance_allowed", True),
+                "wildcard_issuance_allowed": caa_result.get(
+                    "wildcard_issuance_allowed", True
+                ),
+                "message": self._get_caa_status_message(caa_result["caa_status"]),
+            }
+
+            self.results["caa_summary"] = summary
+
+        except Exception as e:
+            logging.debug(f"CAA summary generation failed: {e}")
+            self.results["caa_summary"] = {
+                "status": "error",
+                "records_found": 0,
+                "authorized_cas": [],
+                "wildcard_authorized_cas": [],
+                "iodef_targets": [],
+                "inherited": False,
+                "checked_domain": None,
+                "issuance_allowed": True,
+                "wildcard_issuance_allowed": True,
+                "message": "⚠️ CAA check failed",
+            }
+
+    @staticmethod
+    def _get_caa_status_message(status):
+        """Get user-friendly message for CAA status"""
+        status_messages = {
+            "valid": "✅ CAA records authorize specific Certificate Authorities",
+            "restricted": "🔒 CAA records restrict certificate issuance",
+            "records_found": "📋 CAA records found",
+            "no_records": "💡 No CAA records found - any CA may issue certificates",
+            "error": "⚠️ CAA check failed",
+        }
+        return status_messages.get(status, "❓ CAA status unknown")
+
+    def _add_detailed_caa_analysis(self, result):
+        """Add comprehensive CAA analysis to detailed validation results"""
+        try:
+            caa_validator = CAAValidator(self.domain)
+            detailed_caa = caa_validator.get_detailed_analysis()
+
+            result["detailed_analysis"]["caa_analysis"] = detailed_caa
+
+            # Refresh basic CAA summary with detailed query results
+            result["caa_summary"] = {
+                "status": detailed_caa.get("caa_status", "unknown"),
+                "records_found": len(detailed_caa.get("caa_records", [])),
+                "authorized_cas": [
+                    ca["ca"] for ca in detailed_caa.get("authorized_cas", [])
+                ],
+                "wildcard_authorized_cas": [
+                    ca["ca"] for ca in detailed_caa.get("wildcard_authorized_cas", [])
+                ],
+                "iodef_targets": [
+                    t["target"] for t in detailed_caa.get("iodef_targets", [])
+                ],
+                "inherited": detailed_caa.get("inherited", False),
+                "checked_domain": detailed_caa.get("checked_domain"),
+                "issuance_allowed": detailed_caa.get("issuance_allowed", True),
+                "wildcard_issuance_allowed": detailed_caa.get(
+                    "wildcard_issuance_allowed", True
+                ),
+                "message": self._get_caa_status_message(
+                    detailed_caa.get("caa_status", "unknown")
+                ),
+            }
+
+        except Exception as e:
+            logging.warning(f"Detailed CAA analysis failed: {e}")
+            result["detailed_analysis"]["caa_analysis"] = {
+                "error": f"CAA analysis failed: {str(e)}",
+                "status": "error",
             }

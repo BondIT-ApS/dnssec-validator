@@ -26,6 +26,7 @@
     <script>
         // Feature flags
         window.SHOW_TLSA_DANE = {{ 'true' if show_tlsa_dane else 'false' }};
+        window.SHOW_CAA = {{ 'true' if show_caa else 'false' }};
         
         // Google Analytics configuration
         window.GA_ENABLED = {{ 'true' if ga_enabled else 'false' }};

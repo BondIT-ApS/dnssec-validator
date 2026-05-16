@@ -465,6 +465,47 @@ tlsa_summary_model = api.model(
     },
 )
 
+caa_summary_model = api.model(
+    "CAASummary",
+    {
+        "status": fields.String(
+            required=True,
+            description="CAA validation status",
+            enum=["valid", "restricted", "records_found", "no_records", "error"],
+        ),
+        "records_found": fields.Integer(
+            required=True, description="Number of CAA records found"
+        ),
+        "authorized_cas": fields.List(
+            fields.String,
+            description="Certificate Authorities authorized for regular issuance",
+        ),
+        "wildcard_authorized_cas": fields.List(
+            fields.String,
+            description="Certificate Authorities authorized for wildcard issuance",
+        ),
+        "iodef_targets": fields.List(
+            fields.String,
+            description="IODEF reporting endpoints (e.g., mailto: or https://)",
+        ),
+        "inherited": fields.Boolean(
+            description="True when CAA records were inherited from a parent zone (RFC 8659)"
+        ),
+        "checked_domain": fields.String(
+            description="Domain at which CAA records were found (target or ancestor)"
+        ),
+        "issuance_allowed": fields.Boolean(
+            description="Whether certificate issuance is permitted by current CAA policy"
+        ),
+        "wildcard_issuance_allowed": fields.Boolean(
+            description="Whether wildcard certificate issuance is permitted by current CAA policy"
+        ),
+        "message": fields.String(
+            required=True, description="User-friendly status message"
+        ),
+    },
+)
+
 validation_result_model = api.model(
     "ValidationResult",
     {
@@ -486,6 +527,9 @@ validation_result_model = api.model(
         "records": fields.Nested(records_model, description="DNSSEC records found"),
         "tlsa_summary": fields.Nested(
             tlsa_summary_model, description="TLSA/DANE validation summary"
+        ),
+        "caa_summary": fields.Nested(
+            caa_summary_model, description="CAA (RFC 8659) validation summary"
         ),
         "errors": fields.List(
             fields.String, description="Any errors encountered during validation"
@@ -649,9 +693,11 @@ class DNSSECValidation(Resource):
         - DS record verification
         - RRSIG signature checking
         - TLSA/DANE validation (RFC 6698)
+        - CAA validation with tree-climbing inheritance (RFC 8659)
 
         Returns detailed validation results including status, trust chain,
-        TLSA validation summary, and all relevant DNSSEC records found.
+        TLSA validation summary, CAA validation summary, and all relevant
+        DNSSEC records found.
         """
         try:
             # Import domain utilities for URL parsing
@@ -1496,7 +1542,10 @@ def index():
     """Serve the main web interface"""
     logger.debug("Main web interface accessed")
     show_tlsa_dane = os.getenv("SHOW_VALIDATION_TLSA_DANE", "false").lower() == "true"
-    return render_template("index.html", show_tlsa_dane=show_tlsa_dane)
+    show_caa = os.getenv("SHOW_VALIDATION_CAA", "true").lower() == "true"
+    return render_template(
+        "index.html", show_tlsa_dane=show_tlsa_dane, show_caa=show_caa
+    )
 
 
 @app.route("/stats")
@@ -1517,7 +1566,13 @@ def check_domain_direct(domain):
     """Direct access like /bondit.dk - render page with pre-filled domain"""
     logger.info(f"Direct domain access: {domain}")
     show_tlsa_dane = os.getenv("SHOW_VALIDATION_TLSA_DANE", "false").lower() == "true"
-    return render_template("index.html", domain=domain, show_tlsa_dane=show_tlsa_dane)
+    show_caa = os.getenv("SHOW_VALIDATION_CAA", "true").lower() == "true"
+    return render_template(
+        "index.html",
+        domain=domain,
+        show_tlsa_dane=show_tlsa_dane,
+        show_caa=show_caa,
+    )
 
 
 @app.route("/<string:domain>/detailed")
@@ -1528,8 +1583,12 @@ def check_domain_detailed(domain):
     """Detailed DNSSEC analysis page like /bondit.dk/detailed"""
     logger.info(f"Detailed domain analysis access: {domain}")
     show_tlsa_dane = os.getenv("SHOW_VALIDATION_TLSA_DANE", "false").lower() == "true"
+    show_caa = os.getenv("SHOW_VALIDATION_CAA", "true").lower() == "true"
     return render_template(
-        "detailed.html", domain=domain, show_tlsa_dane=show_tlsa_dane
+        "detailed.html",
+        domain=domain,
+        show_tlsa_dane=show_tlsa_dane,
+        show_caa=show_caa,
     )
 
 
