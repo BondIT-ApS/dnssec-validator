@@ -1,11 +1,13 @@
 import logging
 import os
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import psutil
 from flask import Flask, jsonify, render_template, request, g
+from flask_caching import Cache
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -51,6 +53,53 @@ Talisman(
 )
 
 
+# Caching configuration from environment variables
+def get_cache_config():
+    """Build Flask-Caching configuration from environment variables.
+
+    Returns a tuple of (config_dict, enabled, respect_dns_ttl) where:
+      - config_dict: a dict suitable for ``Cache(app, config=...)``
+      - enabled: boolean indicating whether caching is enabled
+      - respect_dns_ttl: boolean indicating whether to clamp the cache TTL
+        to the smallest DNS record TTL observed in the validation result.
+    """
+    enabled = os.getenv("CACHE_ENABLED", "false").lower() in ["true", "1", "yes"]
+    backend = os.getenv("CACHE_BACKEND", "simple").lower()
+    try:
+        default_timeout = int(os.getenv("CACHE_DEFAULT_TIMEOUT", "300"))
+    except ValueError:
+        default_timeout = 300
+    respect_dns_ttl = os.getenv("CACHE_RESPECT_DNS_TTL", "true").lower() in [
+        "true",
+        "1",
+        "yes",
+    ]
+
+    # Map backend identifier to Flask-Caching CACHE_TYPE
+    backend_map = {
+        "simple": "SimpleCache",
+        "redis": "RedisCache",
+        "null": "NullCache",
+    }
+    cache_type = backend_map.get(backend, "SimpleCache")
+
+    # If caching is disabled we still build a NullCache instance so that the
+    # rest of the code can safely invoke cache operations without conditionals.
+    if not enabled:
+        cache_type = "NullCache"
+
+    config = {
+        "CACHE_TYPE": cache_type,
+        "CACHE_DEFAULT_TIMEOUT": default_timeout,
+    }
+
+    redis_url = os.getenv("CACHE_REDIS_URL")
+    if redis_url:
+        config["CACHE_REDIS_URL"] = redis_url
+
+    return config, enabled, respect_dns_ttl
+
+
 # Rate limiting configuration from environment variables
 def get_rate_limits():
     return {
@@ -73,6 +122,196 @@ limiter = Limiter(
         f"{rate_limits['global_hour']} per hour",
     ],
 )
+
+# Caching: initialise Flask-Caching with the configured backend. When the
+# feature flag is disabled we still create a NullCache instance so that the
+# cache API can be invoked unconditionally throughout the code base.
+_cache_config, CACHE_ENABLED, CACHE_RESPECT_DNS_TTL = get_cache_config()
+try:
+    cache = Cache(app, config=_cache_config)
+except Exception as _cache_init_exc:  # pylint: disable=broad-except
+    # Fall back to NullCache when the requested backend cannot be constructed
+    # (e.g. CACHE_BACKEND=redis but the redis package is not installed).
+    logging.getLogger(__name__).warning(
+        "Failed to initialise cache backend %s: %s. Falling back to NullCache.",
+        _cache_config.get("CACHE_TYPE"),
+        _cache_init_exc,
+    )
+    cache = Cache(app, config={"CACHE_TYPE": "NullCache"})
+
+
+# Cache hit/miss statistics. These counters are in-process and reset whenever
+# the worker restarts; they are intentionally not persisted because the cache
+# itself is per-process when using SimpleCache.
+class CacheStats:
+    """Thread-safe hit/miss counters for the validation cache."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.hits = 0
+        self.misses = 0
+        self.sets = 0
+        self.skipped = 0  # results that were intentionally not cached
+
+    def record_hit(self):
+        with self._lock:
+            self.hits += 1
+
+    def record_miss(self):
+        with self._lock:
+            self.misses += 1
+
+    def record_set(self):
+        with self._lock:
+            self.sets += 1
+
+    def record_skipped(self):
+        with self._lock:
+            self.skipped += 1
+
+    def reset(self):
+        with self._lock:
+            self.hits = 0
+            self.misses = 0
+            self.sets = 0
+            self.skipped = 0
+
+    def as_dict(self):
+        with self._lock:
+            total = self.hits + self.misses
+            hit_ratio = (self.hits / total) if total else 0.0
+            return {
+                "enabled": CACHE_ENABLED,
+                "backend": _cache_config.get("CACHE_TYPE", "NullCache"),
+                "default_timeout": _cache_config.get("CACHE_DEFAULT_TIMEOUT"),
+                "respect_dns_ttl": CACHE_RESPECT_DNS_TTL,
+                "hits": self.hits,
+                "misses": self.misses,
+                "sets": self.sets,
+                "skipped": self.skipped,
+                "total_lookups": total,
+                "hit_ratio": round(hit_ratio, 4),
+            }
+
+
+cache_stats = CacheStats()
+
+
+def _cache_key(domain, request_type):
+    """Build a stable cache key for a (domain, request_type) tuple."""
+    return f"dnssec:{request_type}:{domain.lower()}"
+
+
+def _is_cacheable_result(result):
+    """Return True when a validation result is safe to cache.
+
+    We deliberately skip 4xx/5xx-style errors so that transient failures do
+    not poison the cache and so that callers see fresh state once an issue
+    is resolved.
+    """
+    if not isinstance(result, dict):
+        return False
+    status = str(result.get("status", "")).lower()
+    if status == "error":
+        return False
+    if result.get("errors"):
+        # Treat any populated errors list as a non-cacheable result.
+        return False
+    return True
+
+
+def _extract_min_dns_ttl(result):
+    """Best-effort extraction of the smallest DNS record TTL from a result.
+
+    Returns None when no usable TTL information is present. The function
+    inspects DNSKEY/DS/RRSIG record structures (where present) and falls
+    back to the standard ``ttl`` field if exposed.
+    """
+    min_ttl = None
+    records = result.get("records") if isinstance(result, dict) else None
+    candidates = []
+    if isinstance(records, dict):
+        for key in ("dnskey", "ds", "rrsig"):
+            entries = records.get(key) or []
+            if isinstance(entries, list):
+                for entry in entries:
+                    if isinstance(entry, dict):
+                        # Several historical names for the TTL field
+                        for field in ("ttl", "original_ttl"):
+                            value = entry.get(field)
+                            if isinstance(value, (int, float)) and value > 0:
+                                candidates.append(int(value))
+    top_ttl = result.get("ttl") if isinstance(result, dict) else None
+    if isinstance(top_ttl, (int, float)) and top_ttl > 0:
+        candidates.append(int(top_ttl))
+    if candidates:
+        min_ttl = min(candidates)
+    return min_ttl
+
+
+def _resolve_timeout(result):
+    """Pick the effective cache timeout for a validation result."""
+    default_timeout = _cache_config.get("CACHE_DEFAULT_TIMEOUT", 300)
+    if not CACHE_RESPECT_DNS_TTL:
+        return default_timeout
+    min_ttl = _extract_min_dns_ttl(result)
+    if min_ttl is None:
+        return default_timeout
+    # Use the tighter of the two values so that we never serve stale data
+    # beyond the DNS record's own TTL.
+    return max(1, min(default_timeout, min_ttl))
+
+
+def validate_with_cache(domain, request_type, validator_fn):
+    """Run ``validator_fn`` for ``domain`` honouring the cache.
+
+    Args:
+        domain: The (already extracted/normalised) domain to validate.
+        request_type: Either ``"basic"`` or ``"detailed"``.
+        validator_fn: Callable returning a validation result dict.
+
+    Returns:
+        The validation result, either from cache or freshly produced.
+    """
+    if not CACHE_ENABLED:
+        return validator_fn()
+
+    key = _cache_key(domain, request_type)
+    cached = cache.get(key)
+    if cached is not None:
+        cache_stats.record_hit()
+        # Surface the cached marker for observability; we copy so callers do
+        # not accidentally mutate the cached value.
+        cached_copy = dict(cached)
+        cached_copy["cached"] = True
+        return cached_copy
+
+    cache_stats.record_miss()
+    result = validator_fn()
+
+    if _is_cacheable_result(result):
+        timeout = _resolve_timeout(result)
+        cache.set(key, result, timeout=timeout)
+        cache_stats.record_set()
+    else:
+        cache_stats.record_skipped()
+
+    return result
+
+
+def invalidate_cached_domain(domain):
+    """Remove every cached validation entry for ``domain``.
+
+    Returns the number of entries that were deleted.
+    """
+    removed = 0
+    for request_type in ("basic", "detailed"):
+        key = _cache_key(domain, request_type)
+        # cache.delete may return None on backends that do not surface a
+        # truthy value; treat any successful call as a removal attempt.
+        if cache.delete(key):
+            removed += 1
+    return removed
 
 
 # Configure logging with environment variable support
@@ -269,6 +508,7 @@ def log_request(response):
         # Determine if this is an internal request (analytics, stats, etc.)
         internal_paths = [
             "/api/analytics/",
+            "/api/cache/",
             "/health",
             "/api/docs",
         ]
@@ -675,6 +915,9 @@ ns_validate = api.namespace("validate", description="DNSSEC validation operation
 ns_analytics = api.namespace(
     "analytics", description="Analytics and statistics operations"
 )
+ns_cache = api.namespace(
+    "cache", description="Validation cache inspection and invalidation"
+)
 
 # Analytics API models
 analytics_overview_model = api.model(
@@ -773,11 +1016,17 @@ class DNSSECValidation(Resource):
             logger.debug(f"Extracted domain for validation: {domain}")
 
             logger.debug(f"Starting DNSSEC validation for domain: {domain}")
-            validator = DNSSECValidator(domain)
-            result = validator.validate()
-            attach_idn_forms(result, domain)
+
+            def _run_validation():
+                validator = DNSSECValidator(domain)
+                res = validator.validate()
+                attach_idn_forms(res, domain)
+                return res
+
+            result = validate_with_cache(domain, "basic", _run_validation)
             logger.info(
-                f"DNSSEC validation completed for {domain} with status: {result.get('status', 'unknown')}"
+                f"DNSSEC validation completed for {domain} with status: "
+                f"{result.get('status', 'unknown')} (cached={result.get('cached', False)})"
             )
             return result, 200
 
@@ -853,11 +1102,17 @@ class DNSSECDetailedValidation(Resource):
             logger.debug(f"Extracted domain for detailed validation: {domain}")
 
             logger.debug(f"Starting detailed DNSSEC analysis for domain: {domain}")
-            validator = DNSSECValidator(domain)
-            result = validator.validate_detailed()
-            attach_idn_forms(result, domain)
+
+            def _run_detailed_validation():
+                validator = DNSSECValidator(domain)
+                res = validator.validate_detailed()
+                attach_idn_forms(res, domain)
+                return res
+
+            result = validate_with_cache(domain, "detailed", _run_detailed_validation)
             logger.info(
-                f"Detailed DNSSEC analysis completed for {domain} with status: {result.get('status', 'unknown')}"
+                f"Detailed DNSSEC analysis completed for {domain} with status: "
+                f"{result.get('status', 'unknown')} (cached={result.get('cached', False)})"
             )
             return result, 200
 
@@ -1424,6 +1679,82 @@ class AnalyticsDomain(Resource):
         except Exception as e:
             logger.error(f"Domain analytics error: {str(e)}", exc_info=True)
             return {"error": "Failed to fetch domain analytics"}, 500
+
+
+# Cache statistics and invalidation endpoints
+@ns_cache.route("/stats")
+class CacheStatsResource(Resource):
+    @ns_cache.doc("get_cache_stats")
+    @ns_cache.response(200, "Success - Cache statistics")
+    @limiter.limit(
+        f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour"
+    )
+    def get(self):
+        """
+        Get cache hit/miss statistics.
+
+        Returns counters for cache hits, misses, writes, and skipped entries
+        (results that were not eligible for caching, e.g. errors) along with
+        the current cache configuration. Counters are in-process and reset
+        when the worker restarts.
+        """
+        return cache_stats.as_dict(), 200
+
+
+@ns_cache.route("/invalidate")
+class CacheInvalidateAllResource(Resource):
+    @ns_cache.doc("invalidate_all_cache")
+    @ns_cache.response(200, "Success - Cache cleared")
+    @limiter.limit(
+        f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour"
+    )
+    def post(self):
+        """
+        Invalidate the entire validation cache and reset statistics.
+
+        Useful in administration scenarios where the underlying DNS state
+        has changed and operators want to force fresh validations.
+        """
+        try:
+            cache.clear()
+            cache_stats.reset()
+            return {"status": "ok", "message": "Cache cleared"}, 200
+        except Exception as e:
+            logger.error(f"Failed to clear cache: {str(e)}", exc_info=True)
+            return {"status": "error", "message": "Failed to clear cache"}, 500
+
+
+@ns_cache.route("/invalidate/<path:domain>")
+@ns_cache.param("domain", "The domain whose cached entries should be removed")
+class CacheInvalidateDomainResource(Resource):
+    @ns_cache.doc("invalidate_cache_domain")
+    @ns_cache.response(200, "Success - Cached entries removed for domain")
+    @ns_cache.response(400, "Bad Request - Invalid domain format")
+    @limiter.limit(
+        f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour"
+    )
+    def post(self, domain):
+        """
+        Invalidate cached validation results for a single domain.
+        """
+        try:
+            from domain_utils import extract_domain_from_input, is_valid_domain_format
+
+            extracted = extract_domain_from_input(domain)
+            if not extracted or not is_valid_domain_format(extracted):
+                return {"status": "error", "message": "Invalid domain"}, 400
+
+            removed = invalidate_cached_domain(extracted)
+            return {
+                "status": "ok",
+                "domain": extracted,
+                "removed_entries": removed,
+            }, 200
+        except Exception as e:
+            logger.error(
+                f"Failed to invalidate cache for {domain}: {str(e)}", exc_info=True
+            )
+            return {"status": "error", "message": "Cache invalidation failed"}, 500
 
 
 # Custom error handlers for rate limiting
