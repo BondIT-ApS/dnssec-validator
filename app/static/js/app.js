@@ -157,6 +157,28 @@ document.addEventListener('DOMContentLoaded', function() {
             html += '</div>';
         }
 
+        // Show CAA summary if available and feature is enabled
+        if (data.caa_summary && window.SHOW_CAA !== false) {
+            html += '<h3>📜 CAA Validation</h3>';
+            html += '<div class="chain-item">';
+            html += '<p><strong>Status:</strong> ' + escapeHTML(data.caa_summary.status) + '</p>';
+            html += '<p><strong>CAA Records Found:</strong> ' + escapeHTML(data.caa_summary.records_found) + '</p>';
+            if (data.caa_summary.inherited && data.caa_summary.checked_domain) {
+                html += '<p><strong>Inherited from:</strong> ' + escapeHTML(data.caa_summary.checked_domain) + '</p>';
+            }
+            if (data.caa_summary.authorized_cas && data.caa_summary.authorized_cas.length > 0) {
+                html += '<p><strong>Authorized CAs:</strong> ' + data.caa_summary.authorized_cas.map(escapeHTML).join(', ') + '</p>';
+            }
+            if (data.caa_summary.wildcard_authorized_cas && data.caa_summary.wildcard_authorized_cas.length > 0) {
+                html += '<p><strong>Wildcard CAs:</strong> ' + data.caa_summary.wildcard_authorized_cas.map(escapeHTML).join(', ') + '</p>';
+            }
+            if (data.caa_summary.iodef_targets && data.caa_summary.iodef_targets.length > 0) {
+                html += '<p><strong>IODEF Targets:</strong> ' + data.caa_summary.iodef_targets.map(escapeHTML).join(', ') + '</p>';
+            }
+            html += '<p style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; font-style: italic;">' + escapeHTML(data.caa_summary.message) + '</p>';
+            html += '</div>';
+        }
+
         if (data.errors && data.errors.length > 0) {
             html += '<h3>Errors</h3>';
             data.errors.forEach(function(error) {

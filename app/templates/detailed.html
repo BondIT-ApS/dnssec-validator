@@ -225,6 +225,7 @@
     <script>
         // Feature flags
         window.SHOW_TLSA_DANE = {{ 'true' if show_tlsa_dane else 'false' }};
+        window.SHOW_CAA = {{ 'true' if show_caa else 'false' }};
         
         let currentDomain = {{ domain|tojson if domain else "null" }};
         
@@ -576,7 +577,99 @@
                     </div>
                 `;
             }
-            
+
+            // CAA Analysis (comprehensive) - only show if feature is enabled
+            if (window.SHOW_CAA !== false && data.detailed_analysis && data.detailed_analysis.caa_analysis) {
+                const caaAnalysis = data.detailed_analysis.caa_analysis;
+                html += `
+                    <div class="section-header">📜 CAA Record Analysis</div>
+                    <div class="subsection">
+                `;
+
+                if (caaAnalysis.error) {
+                    html += `<p style="color: #dc3545;">❌ CAA analysis failed: ${caaAnalysis.error}</p>`;
+                } else {
+                    html += `<p><strong>Status:</strong> ${caaAnalysis.caa_status || 'unknown'}</p>`;
+                    if (caaAnalysis.checked_domain) {
+                        html += `<p><strong>Records Queried At:</strong> ${caaAnalysis.checked_domain}${caaAnalysis.inherited ? ' <em>(inherited from parent zone)</em>' : ''}</p>`;
+                    }
+
+                    if (caaAnalysis.caa_records && caaAnalysis.caa_records.length > 0) {
+                        html += `
+                            <h4>📋 CAA Records (${caaAnalysis.caa_records.length} found)</h4>
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                                    <tr style="background: #e9ecef;">
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Flags</th>
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Tag</th>
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Value</th>
+                                        <th style="padding: 8px; border: 1px solid #dee2e6;">Critical</th>
+                                    </tr>
+                        `;
+                        caaAnalysis.caa_records.forEach(record => {
+                            html += `
+                                <tr>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6;">${record.flags}</td>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6;">${record.tag}</td>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace; font-size: 0.9em;">${record.value}</td>
+                                    <td style="padding: 8px; border: 1px solid #dee2e6;">${record.critical ? 'Yes' : 'No'}</td>
+                                </tr>
+                            `;
+                        });
+                        html += '</table></div>';
+                    } else {
+                        html += '<h4>📋 CAA Records</h4><p style="color: #6c757d;">💡 No CAA records found</p>';
+                    }
+
+                    if (caaAnalysis.authorized_cas && caaAnalysis.authorized_cas.length > 0) {
+                        html += '<h4>✅ Authorized Certificate Authorities</h4><ul>';
+                        caaAnalysis.authorized_cas.forEach(ca => {
+                            html += `<li>${ca.ca}${ca.critical ? ' <em>(critical)</em>' : ''}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (caaAnalysis.wildcard_authorized_cas && caaAnalysis.wildcard_authorized_cas.length > 0) {
+                        html += '<h4>✳️ Wildcard Authorized CAs</h4><ul>';
+                        caaAnalysis.wildcard_authorized_cas.forEach(ca => {
+                            html += `<li>${ca.ca}${ca.critical ? ' <em>(critical)</em>' : ''}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+
+                    if (caaAnalysis.iodef_targets && caaAnalysis.iodef_targets.length > 0) {
+                        html += '<h4>📨 IODEF Reporting</h4><ul>';
+                        caaAnalysis.iodef_targets.forEach(t => {
+                            html += `<li>${t.target}${t.critical ? ' <em>(critical)</em>' : ''}</li>`;
+                        });
+                        html += '</ul>';
+                    }
+                }
+
+                if (caaAnalysis.detailed_analysis && caaAnalysis.detailed_analysis.recommendations && caaAnalysis.detailed_analysis.recommendations.length > 0) {
+                    html += `
+                        <div style="background: #d1ecf1; border: 1px solid #b8daff; border-radius: 5px; padding: 15px; margin: 15px 0;">
+                            <h4 style="color: #0c5460; margin-bottom: 10px;">💡 CAA Recommendations</h4>
+                            <ul style="margin: 0; color: #0c5460;">
+                    `;
+                    caaAnalysis.detailed_analysis.recommendations.forEach(rec => {
+                        html += `<li>${rec}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+
+                html += '</div>';
+            } else if (window.SHOW_CAA !== false && data.caa_summary) {
+                html += `
+                    <div class="section-header">📜 CAA Summary</div>
+                    <div class="subsection">
+                        <p><strong>Status:</strong> ${data.caa_summary.status}</p>
+                        <p><strong>CAA Records Found:</strong> ${data.caa_summary.records_found}</p>
+                        <p style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; font-style: italic;">${data.caa_summary.message}</p>
+                    </div>
+                `;
+            }
+
             // Raw DNS Queries
             if (data.detailed_analysis && data.detailed_analysis.raw_dns_queries) {
                 html += `
