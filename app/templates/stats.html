@@ -193,6 +193,52 @@
             color: #3498db;
             font-weight: bold;
         }
+
+        .domain-count-link {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s, text-decoration 0.3s;
+        }
+
+        .domain-count-link:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+
+        .filter-banner {
+            background: #ecf6fd;
+            border: 1px solid #3498db;
+            color: #2c3e50;
+            padding: 12px 18px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .filter-banner strong {
+            color: #2980b9;
+        }
+
+        .clear-filter-btn {
+            padding: 6px 14px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .clear-filter-btn:hover {
+            background: #c0392b;
+        }
         
         .loading {
             text-align: center;
@@ -256,6 +302,11 @@
             <button class="time-btn" data-period="30d">Last 30 Days</button>
             <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
         </div>
+
+        <div id="filter-banner" class="filter-banner" style="display: none;">
+            <span>Filtering by domain: <strong id="filter-domain-name"></strong></span>
+            <a href="/stats" class="clear-filter-btn">✕ Clear filter</a>
+        </div>
         
         <div class="stats-grid">
             <div class="stat-card">
@@ -299,7 +350,7 @@
             </div>
         </div>
         
-        <div class="top-domains">
+        <div class="top-domains" id="top-domains-section">
             <div class="chart-title">Top Validated Domains</div>
             <ul class="domains-list" id="top-domains-list">
                 <li class="loading">Loading domains...</li>
@@ -308,6 +359,8 @@
     </div>
 
     <script>
+        const SHOW_DOMAIN_CHECK_HISTORY = {{ 'true' if show_domain_check_history else 'false' }};
+        const FILTER_DOMAIN = new URLSearchParams(window.location.search).get('domain');
         let currentPeriod = '1h';
         let charts = {};
         
@@ -416,75 +469,13 @@
             try {
                 // Show loading state
                 document.querySelectorAll('.stat-number').forEach(el => el.textContent = '-');
-                
-                // Fetch overview data
-                const overviewResponse = await fetch(`/api/analytics/overview?period=${currentPeriod}`);
-                const overviewData = await overviewResponse.json();
-                
-                if (overviewResponse.ok) {
-                    console.log('Overview data:', overviewData);
-                    
-                    // Update stats cards
-                    document.getElementById('total-requests').textContent = (overviewData.total_requests || 0).toLocaleString();
-                    document.getElementById('api-requests').textContent = (overviewData.api_requests || 0).toLocaleString();
-                    document.getElementById('web-requests').textContent = (overviewData.web_requests || 0).toLocaleString();
-                    
-                    const successRate = overviewData.validation_ratio && overviewData.validation_ratio.valid ? 
-                        overviewData.validation_ratio.valid.percentage : 0;
-                    document.getElementById('success-rate').textContent = successRate + '%';
-                    
-                    // Update validation chart
-                    if (overviewData.validation_ratio) {
-                        const validationData = overviewData.validation_ratio;
-                        charts.validation.data.datasets[0].data = [
-                            validationData.valid ? validationData.valid.count : 0,
-                            validationData.invalid ? validationData.invalid.count : 0,
-                            validationData.error ? validationData.error.count : 0
-                        ];
-                        charts.validation.update();
-                    }
-                    
-                    // Update top domains
-                    const domainsList = document.getElementById('top-domains-list');
-                    if (overviewData.top_domains && overviewData.top_domains.length > 0) {
-                        domainsList.innerHTML = overviewData.top_domains.map(([domain, count]) => `
-                            <li>
-                                <a href="/${domain}" class="domain-link" target="_blank" rel="noopener noreferrer" title="Validate ${domain} in new tab">${domain}</a>
-                                <span class="domain-count">${count.toLocaleString()}</span>
-                            </li>
-                        `).join('');
-                    } else {
-                        domainsList.innerHTML = '<li style="text-align: center; color: #7f8c8d;">No data available</li>';
-                    }
+
+                if (SHOW_DOMAIN_CHECK_HISTORY && FILTER_DOMAIN) {
+                    await updateDomainAnalytics(FILTER_DOMAIN);
                 } else {
-                    console.error('Failed to fetch overview data:', overviewResponse.status, overviewData);
+                    await updateOverviewAnalytics();
                 }
-                
-                // Fetch time series data
-                const timeseriesResponse = await fetch(`/api/analytics/timeseries?period=${currentPeriod}`);
-                const timeseriesData = await timeseriesResponse.json();
-                
-                if (timeseriesResponse.ok && timeseriesData.data) {
-                    const labels = timeseriesData.data.map(item => formatTimestamp(item.timestamp));
-                    const data = timeseriesData.data.map(item => item.requests);
-                    
-                    charts.timeseries.data.labels = labels;
-                    charts.timeseries.data.datasets[0].data = data;
-                    charts.timeseries.update();
-                }
-                
-                // Fetch sources data for selected period
-                const sourcesResponse = await fetch(`/api/analytics/sources?period=${currentPeriod}`);
-                const sourcesData = await sourcesResponse.json();
-                
-                if (sourcesResponse.ok) {
-                    charts.sources.data.datasets[0].data = [
-                        sourcesData.external || 0,
-                        sourcesData.webapp || 0
-                    ];
-                    charts.sources.update();
-                }
-                
+
             } catch (error) {
                 console.error('Error updating analytics:', error);
                 const errorDiv = document.createElement('div');
@@ -494,10 +485,138 @@
                 setTimeout(() => errorDiv.remove(), 5000);
             }
         }
+
+        async function updateOverviewAnalytics() {
+            // Fetch overview data
+            const overviewResponse = await fetch(`/api/analytics/overview?period=${currentPeriod}`);
+            const overviewData = await overviewResponse.json();
+
+            if (overviewResponse.ok) {
+                document.getElementById('total-requests').textContent = (overviewData.total_requests || 0).toLocaleString();
+                document.getElementById('api-requests').textContent = (overviewData.api_requests || 0).toLocaleString();
+                document.getElementById('web-requests').textContent = (overviewData.web_requests || 0).toLocaleString();
+
+                const successRate = overviewData.validation_ratio && overviewData.validation_ratio.valid ?
+                    overviewData.validation_ratio.valid.percentage : 0;
+                document.getElementById('success-rate').textContent = successRate + '%';
+
+                if (overviewData.validation_ratio) {
+                    const validationData = overviewData.validation_ratio;
+                    charts.validation.data.datasets[0].data = [
+                        validationData.valid ? validationData.valid.count : 0,
+                        validationData.invalid ? validationData.invalid.count : 0,
+                        validationData.error ? validationData.error.count : 0
+                    ];
+                    charts.validation.update();
+                }
+
+                renderTopDomains(overviewData.top_domains);
+            } else {
+                console.error('Failed to fetch overview data:', overviewResponse.status, overviewData);
+            }
+
+            // Fetch time series data
+            const timeseriesResponse = await fetch(`/api/analytics/timeseries?period=${currentPeriod}`);
+            const timeseriesData = await timeseriesResponse.json();
+
+            if (timeseriesResponse.ok && timeseriesData.data) {
+                const labels = timeseriesData.data.map(item => formatTimestamp(item.timestamp));
+                const data = timeseriesData.data.map(item => item.requests);
+                charts.timeseries.data.labels = labels;
+                charts.timeseries.data.datasets[0].data = data;
+                charts.timeseries.update();
+            }
+
+            // Fetch sources data for selected period
+            const sourcesResponse = await fetch(`/api/analytics/sources?period=${currentPeriod}`);
+            const sourcesData = await sourcesResponse.json();
+
+            if (sourcesResponse.ok) {
+                charts.sources.data.datasets[0].data = [
+                    sourcesData.external || 0,
+                    sourcesData.webapp || 0
+                ];
+                charts.sources.update();
+            }
+        }
+
+        async function updateDomainAnalytics(domain) {
+            const response = await fetch(`/api/analytics/domain/${encodeURIComponent(domain)}?period=${currentPeriod}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.error('Failed to fetch domain analytics:', response.status, data);
+                return;
+            }
+
+            const total = data.total_requests || 0;
+            document.getElementById('total-requests').textContent = total.toLocaleString();
+            document.getElementById('api-requests').textContent = (data.sources && data.sources.external || 0).toLocaleString();
+            document.getElementById('web-requests').textContent = (data.sources && data.sources.webapp || 0).toLocaleString();
+
+            const successRate = data.validation_ratio && data.validation_ratio.valid ?
+                data.validation_ratio.valid.percentage : 0;
+            document.getElementById('success-rate').textContent = successRate + '%';
+
+            if (data.validation_ratio) {
+                charts.validation.data.datasets[0].data = [
+                    data.validation_ratio.valid ? data.validation_ratio.valid.count : 0,
+                    data.validation_ratio.invalid ? data.validation_ratio.invalid.count : 0,
+                    data.validation_ratio.error ? data.validation_ratio.error.count : 0
+                ];
+                charts.validation.update();
+            }
+
+            if (data.timeline) {
+                charts.timeseries.data.labels = data.timeline.map(item => formatTimestamp(item.timestamp));
+                charts.timeseries.data.datasets[0].data = data.timeline.map(item => item.requests);
+                charts.timeseries.update();
+            }
+
+            if (data.sources) {
+                charts.sources.data.datasets[0].data = [
+                    data.sources.external || 0,
+                    data.sources.webapp || 0
+                ];
+                charts.sources.update();
+            }
+        }
+
+        function renderTopDomains(topDomains) {
+            const domainsList = document.getElementById('top-domains-list');
+            if (!topDomains || topDomains.length === 0) {
+                domainsList.innerHTML = '<li style="text-align: center; color: #7f8c8d;">No data available</li>';
+                return;
+            }
+            domainsList.innerHTML = topDomains.map(([domain, count]) => {
+                const safeDomain = String(domain).replace(/[<>"']/g, '');
+                const countCell = SHOW_DOMAIN_CHECK_HISTORY
+                    ? `<a href="/stats?domain=${encodeURIComponent(safeDomain)}" class="domain-count-link" title="View history for ${safeDomain}">${count.toLocaleString()}</a>`
+                    : `<span class="domain-count">${count.toLocaleString()}</span>`;
+                return `
+                    <li>
+                        <a href="/${safeDomain}" class="domain-link" target="_blank" rel="noopener noreferrer" title="Validate ${safeDomain} in new tab">${safeDomain}</a>
+                        ${countCell}
+                    </li>
+                `;
+            }).join('');
+        }
         
+        function applyDomainFilterUI() {
+            if (SHOW_DOMAIN_CHECK_HISTORY && FILTER_DOMAIN) {
+                const banner = document.getElementById('filter-banner');
+                document.getElementById('filter-domain-name').textContent = FILTER_DOMAIN;
+                banner.style.display = 'flex';
+                document.getElementById('top-domains-section').style.display = 'none';
+                document.querySelector('.dashboard-title').textContent =
+                    `📊 Analytics: ${FILTER_DOMAIN}`;
+            }
+        }
+
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
             initCharts();
+            applyDomainFilterUI();
             updateAnalytics();
             
             // Time period selection
