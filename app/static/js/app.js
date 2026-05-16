@@ -101,9 +101,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displayResults(data) {
-        let html = '<h2>Validation Results for ' + escapeHTML(data.domain) + '</h2>';
-        
-        // Status with appropriate styling  
+        // Prefer the Unicode (U-label) representation for display when the
+        // server returns one — falls back to ``domain`` for older payloads.
+        const displayName = data.domain_unicode || data.domain;
+        let html = '<h2>Validation Results for ' + escapeHTML(displayName) + '</h2>';
+
+        // If the domain is an IDN, surface both representations so users can
+        // see the punycode form actually used for DNS queries.
+        if (data.domain_unicode && data.domain_ascii && data.domain_unicode !== data.domain_ascii) {
+            html += '<p class="idn-info"><strong>Unicode:</strong> ' + escapeHTML(data.domain_unicode) +
+                    ' &nbsp;|&nbsp; <strong>Punycode:</strong> <code>' + escapeHTML(data.domain_ascii) + '</code></p>';
+        }
+
+        // Status with appropriate styling
         let statusClass = 'status-' + escapeHTML(data.status);
         html += '<p><strong>Status:</strong> <span class="' + statusClass + '">' + escapeHTML(data.status.toUpperCase()) + '</span></p>';
         html += '<p><strong>Validation Time:</strong> ' + escapeHTML(new Date(data.validation_time).toLocaleString()) + '</p>';
