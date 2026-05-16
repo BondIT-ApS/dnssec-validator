@@ -146,6 +146,7 @@ class InfluxDBLogger:
         days: int = None,
         source: str = None,
         include_internal: bool = True,
+        domain: str = None,
     ) -> int:
         """Get request count for specified time period"""
         try:
@@ -173,6 +174,10 @@ class InfluxDBLogger:
             # Add source filter if specified
             if source:
                 flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
+
+            # Add domain filter if specified
+            if domain:
+                flux_query += f'|> filter(fn: (r) => r.domain == "{domain}")'
 
             # Collapse all series and sum
             flux_query += "|> group() |> sum()"
@@ -239,6 +244,7 @@ class InfluxDBLogger:
         hours: int = None,
         include_internal: bool = True,
         source: str = "api",
+        domain: str = None,
     ) -> Dict[str, Any]:
         """Get ratio of valid vs invalid vs error validations.
         Percentages are computed excluding 'error' from the denominator (valid+invalid).
@@ -261,6 +267,10 @@ class InfluxDBLogger:
             # Only API by default
             if source:
                 flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
+
+            # Add domain filter if specified
+            if domain:
+                flux_query += f'|> filter(fn: (r) => r.domain == "{domain}")'
 
             flux_query += '|> group(columns: ["dnssec_status"]) |> sum()'
 
@@ -301,6 +311,7 @@ class InfluxDBLogger:
         include_internal: bool = True,
         window_every: str = "1h",
         source: str = "api",
+        domain: str = None,
     ) -> List[tuple]:
         """Get request counts aggregated by a dynamic window. Returns list of (ISO timestamp, count)."""
         try:
@@ -319,6 +330,10 @@ class InfluxDBLogger:
             # Only API by default
             if source:
                 flux_query += f'|> filter(fn: (r) => r.source == "{source}")'
+
+            # Add domain filter if specified
+            if domain:
+                flux_query += f'|> filter(fn: (r) => r.domain == "{domain}")'
 
             flux_query += f"""
                 |> drop(columns: ["domain", "dnssec_status", "ip_address", "_measurement", "_field"])
@@ -350,7 +365,12 @@ class InfluxDBLogger:
             print(f"Error getting hourly requests: {e}")
             return []
 
-    def get_source_breakdown(self, days: int = None, hours: int = None) -> List[tuple]:
+    def get_source_breakdown(
+        self,
+        days: int = None,
+        hours: int = None,
+        domain: str = None,
+    ) -> List[tuple]:
         """Get breakdown of API usage 'external' vs 'webapp' via client tag for API-only requests"""
         try:
             time_range = f"-{hours}h" if hours else (f"-{days}d" if days else "-30d")
@@ -361,6 +381,13 @@ class InfluxDBLogger:
                 |> filter(fn: (r) => r._measurement == "request")
                 |> filter(fn: (r) => r._field == "count")
                 |> filter(fn: (r) => r.source == "api")
+            """
+
+            # Add domain filter if specified
+            if domain:
+                flux_query += f'|> filter(fn: (r) => r.domain == "{domain}")'
+
+            flux_query += """
                 |> group(columns: ["client"])
                 |> sum()
             """
@@ -598,3 +625,46 @@ class RequestLog:
         return influx_logger.get_hourly_requests(
             hours, include_internal=False, window_every=window_every, source="api"
         )
+
+    # Domain-scoped methods for per-domain history dashboard
+    @classmethod
+    def get_domain_requests_count(
+        cls, domain: str, hours: int = None, days: int = None
+    ) -> int:
+        return influx_logger.get_requests_count(
+            hours=hours,
+            days=days,
+            source="api",
+            include_internal=False,
+            domain=domain,
+        )
+
+    @classmethod
+    def get_domain_validation_ratio(
+        cls, domain: str, hours: int = None, days: int = None
+    ) -> Dict[str, Any]:
+        return influx_logger.get_validation_ratio(
+            days=days,
+            hours=hours,
+            include_internal=False,
+            source="api",
+            domain=domain,
+        )
+
+    @classmethod
+    def get_domain_hourly_requests(
+        cls, domain: str, hours: int = 24, window_every: str = "1h"
+    ) -> List[tuple]:
+        return influx_logger.get_hourly_requests(
+            hours,
+            include_internal=False,
+            window_every=window_every,
+            source="api",
+            domain=domain,
+        )
+
+    @classmethod
+    def get_domain_source_breakdown(
+        cls, domain: str, hours: int = None, days: int = None
+    ) -> List[tuple]:
+        return influx_logger.get_source_breakdown(days=days, hours=hours, domain=domain)

@@ -178,6 +178,12 @@ def show_attribution():
     return attribution in ["true", "1", "yes"]  # Support true, 1, yes for flexibility
 
 
+def show_domain_check_history():
+    """Check if domain-specific validation history is enabled"""
+    flag = os.getenv("SHOW_DOMAIN_CHECK_HISTORY", "false").lower()
+    return flag in ["true", "1", "yes"]
+
+
 # Google Analytics configuration
 def get_analytics_config():
     """Get Google Analytics configuration with validation"""
@@ -204,6 +210,12 @@ def get_analytics_config():
 def inject_attribution():
     """Make attribution setting available to all templates"""
     return {"show_attribution": show_attribution()}
+
+
+@app.context_processor
+def inject_domain_check_history():
+    """Make domain history flag available to all templates"""
+    return {"show_domain_check_history": show_domain_check_history()}
 
 
 @app.context_processor
@@ -1226,6 +1238,89 @@ class AnalyticsSources(Resource):
         except Exception as e:
             logger.error(f"Analytics sources error: {str(e)}", exc_info=True)
             return {"error": "Failed to fetch source breakdown"}, 500
+
+
+@ns_analytics.route("/domain/<path:domain>")
+@ns_analytics.param("domain", "The domain to fetch validation history for")
+class AnalyticsDomain(Resource):
+    @ns_analytics.doc("get_domain_analytics")
+    @ns_analytics.param(
+        "period", "Time period: 1h, 24h, 7d, 30d", _in="query", default="24h"
+    )
+    @ns_analytics.response(200, "Success - Domain analytics data")
+    @ns_analytics.response(400, "Bad Request - Invalid domain or period")
+    @ns_analytics.response(404, "Not Found - Feature disabled")
+    @limiter.limit(
+        f"{rate_limits['api_minute']} per minute; {rate_limits['api_hour']} per hour"
+    )
+    def get(self, domain):
+        """
+        Get domain-specific validation analytics
+
+        Returns request counts, validation ratio, source breakdown, and
+        a request timeline for a single domain over the requested period.
+
+        Gated by the SHOW_DOMAIN_CHECK_HISTORY environment variable.
+        """
+        if not show_domain_check_history():
+            return {"error": "Domain history feature is disabled"}, 404
+
+        try:
+            from domain_utils import extract_domain_from_input, is_valid_domain_format
+
+            extracted = extract_domain_from_input(domain)
+            if not extracted or not is_valid_domain_format(extracted):
+                return {"error": f"Invalid domain: {domain}"}, 400
+            domain = extracted
+
+            period = request.args.get("period", "24h")
+            if period == "1h":
+                hours, days, window = 1, None, "5m"
+            elif period == "24h":
+                hours, days, window = 24, None, "15m"
+            elif period == "7d":
+                hours, days, window = 168, None, "1d"
+            elif period == "30d":
+                hours, days, window = 720, None, "1d"
+            else:
+                return {"error": "Invalid period. Use: 1h, 24h, 7d, 30d"}, 400
+
+            total = RequestLog.get_domain_requests_count(
+                domain=domain, hours=hours, days=days
+            )
+            validation_ratio = RequestLog.get_domain_validation_ratio(
+                domain=domain, hours=hours, days=days
+            )
+            source_data = RequestLog.get_domain_source_breakdown(
+                domain=domain, hours=hours, days=days
+            )
+            hourly_data = RequestLog.get_domain_hourly_requests(
+                domain=domain, hours=hours, window_every=window
+            )
+
+            sources = {"external": 0, "webapp": 0}
+            for client, count in source_data:
+                key = client or "external"
+                if key not in sources:
+                    sources[key] = 0
+                sources[key] += count
+
+            timeline = [
+                {"timestamp": ts, "requests": count} for ts, count in hourly_data
+            ]
+
+            return {
+                "domain": domain,
+                "period": period,
+                "total_requests": total,
+                "validation_ratio": validation_ratio,
+                "sources": sources,
+                "timeline": timeline,
+            }, 200
+
+        except Exception as e:
+            logger.error(f"Domain analytics error: {str(e)}", exc_info=True)
+            return {"error": "Failed to fetch domain analytics"}, 500
 
 
 # Custom error handlers for rate limiting
