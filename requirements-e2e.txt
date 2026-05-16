@@ -1,0 +1,16 @@
+# End-to-end (E2E) test dependencies.
+#
+# These are kept OUT of requirements.txt on purpose: Playwright pulls in a
+# large download (browser binaries) and is only needed by developers who
+# explicitly run the browser-based test suite under tests/e2e/.
+#
+# Install with:
+#   pip install -r requirements-e2e.txt
+#   playwright install chromium
+#
+# Then run the e2e suite (the app must be reachable at BASE_URL, default
+# http://localhost:8080):
+#   pytest tests/e2e --no-cov -p no:cacheprovider
+
+playwright>=1.49.0,<2.0.0
+pytest-playwright>=0.7.0,<1.0.0

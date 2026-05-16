@@ -35,8 +35,19 @@ tests/
 ├── integration/                          # Integration tests (28 tests)
 │   ├── test_app_endpoints.py            # Flask API endpoint tests (15 tests)
 │   └── test_validation_workflow.py      # End-to-end workflow tests (13 tests)
+├── e2e/                                  # Playwright browser tests (opt-in)
+│   ├── conftest.py                      # Browser fixtures and BASE_URL probe
+│   ├── test_web_ui.py                   # UI smoke tests (controls, nav, /api/docs/)
+│   ├── test_validation_flow.py          # Validation flow incl. TLSA/DANE flag
+│   └── README.md                        # Setup, configuration, and usage
 └── README.md                             # This file
 ```
+
+> **Note**: `tests/e2e/` is excluded from the default `pytest tests/` collection
+> via `pytest.ini` (`--ignore=tests/e2e`). Run it explicitly with
+> `pytest tests/e2e --no-cov -p no:cacheprovider` after `pip install -r
+> requirements-e2e.txt && playwright install chromium`. See
+> [`tests/e2e/README.md`](e2e/README.md) for full details.
 
 ## Running Tests
 
