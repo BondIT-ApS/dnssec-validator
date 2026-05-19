@@ -13,4 +13,4 @@
 #   pytest tests/e2e --no-cov -p no:cacheprovider
 
 playwright>=1.49.0,<2.0.0
-pytest-playwright>=0.7.0,<1.0.0
+pytest-playwright>=0.8.0,<1.0.0
