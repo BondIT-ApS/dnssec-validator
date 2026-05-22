@@ -11,7 +11,7 @@ flask-talisman>=1.1.0
 flask-caching==2.4.0
 psutil>=7.2.2
 influxdb-client>=1.50.0
-click>=8.3.3
+click>=8.4.1
 idna>=3.11
 
 # Testing dependencies
