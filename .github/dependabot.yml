@@ -18,6 +18,20 @@ updates:
     commit-message:
       prefix: "chore(deps):"
       include: "scope"
+    groups:
+      # Bundle patch + minor bumps into a single weekly PR per category.
+      # Security advisories always come as separate PRs (Dependabot default).
+      # Majors stay separate so they get a proper review.
+      pip-production:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      pip-development:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Enable version updates for Docker
   - package-ecosystem: "docker"
@@ -37,3 +51,10 @@ updates:
     commit-message:
       prefix: "chore(deps):"
       include: "scope"
+    groups:
+      docker:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
