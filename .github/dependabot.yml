@@ -1,60 +1,61 @@
 version: 2
+
+# ──────────────────────────────────────────────────────────────────────────
+# Dependabot — security-updates only mode (org-wide standard)
+# ──────────────────────────────────────────────────────────────────────────
+# Routine version-update PRs are DISABLED via open-pull-requests-limit: 0.
+# The weekly digest at .github/workflows/weekly-security-report.yml is the
+# source of truth for routine bumps (Mondays 09:00 UTC).
+#
+# Security-update PRs (CVE response) are STILL ENABLED — they're a separate
+# Dependabot mode controlled by repo Settings → Code security → Dependabot
+# security updates. That toggle stays ON. When a CVE drops on a dependency
+# we use, Dependabot will still open a PR within hours.
+# ──────────────────────────────────────────────────────────────────────────
+
 updates:
-  # Enable version updates for pip
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "21:12"
+      time: "06:00"
       timezone: "Europe/Copenhagen"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "MaBoNi"
-    assignees:
-      - "MaBoNi"
+    open-pull-requests-limit: 0  # version-updates off; security-updates still flow
     labels:
       - "dependencies"
+      - "python"
     commit-message:
-      prefix: "chore(deps):"
+      prefix: "deps"
       include: "scope"
-    groups:
-      # Bundle patch + minor bumps into a single weekly PR per category.
-      # Security advisories always come as separate PRs (Dependabot default).
-      # Majors stay separate so they get a proper review.
-      pip-production:
-        dependency-type: "production"
-        update-types:
-          - "minor"
-          - "patch"
-      pip-development:
-        dependency-type: "development"
-        update-types:
-          - "minor"
-          - "patch"
 
-  # Enable version updates for Docker
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "21:12"
+      time: "06:00"
       timezone: "Europe/Copenhagen"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "MaBoNi"
-    assignees:
-      - "MaBoNi"
+    open-pull-requests-limit: 0  # version-updates off; security-updates still flow
     labels:
       - "dependencies"
+      - "docker"
     commit-message:
-      prefix: "chore(deps):"
+      prefix: "deps"
       include: "scope"
-    groups:
-      docker:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Copenhagen"
+    open-pull-requests-limit: 0  # version-updates off; security-updates still flow
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
