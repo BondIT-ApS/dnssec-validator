@@ -224,7 +224,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          # setuptools too: `safety check` below scans the whole interpreter,
+          # and the hosted runner's Python toolcache ships a setuptools old
+          # enough to carry advisories (SFTY-20260721-58460 on 79.0.1) that
+          # nothing in requirements.txt controls.
+          python -m pip install --upgrade pip setuptools
           pip install -r requirements.txt
           pip install pytest pytest-cov safety bandit
 
